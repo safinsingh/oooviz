@@ -62,12 +62,11 @@ button:disabled { opacity: 0.4; cursor: default; background: white; }
 .workspace.with-pool { grid-template-columns: 200px minmax(0, 1fr) 470px; width: min(1760px, 100%); }
 .instruction-pool { align-self: start; margin-top: 60px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
 .instruction-pool h2 { font: 600 14px system-ui, sans-serif; margin: 0; padding: 16px; background: #f8fafc; }
-.instruction-pool ol { list-style: none; padding: 0; margin: 0; }
-.instruction-pool li { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; padding: 14px 12px; border-top: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
-.instruction-pool small { grid-column: 2 / -1; color: #64748b; }
+.instruction-pool ol { list-style: none; padding: 12px; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.instruction-pool li { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 3px; background: #2563eb; color: white; font: 600 28px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .instruction-pool li.pool-yellow { background: #fef08a; color: #233145; }
 .instruction-pool li.pool-red { background: #fecaca; color: #991b1b; }
-.instruction-pool .pool-empty { color: #94a3b8; display: block; }
+.instruction-pool .pool-empty { width: 100%; height: auto; background: transparent; color: #94a3b8; font: 14px system-ui, sans-serif; }
 @media (max-width: 1200px) {
   .workspace.with-pool { grid-template-columns: 180px minmax(0, 1fr); }
   .with-pool .instruction-log { grid-column: 1 / -1; width: min(800px, 100%); justify-self: center; height: 420px; }

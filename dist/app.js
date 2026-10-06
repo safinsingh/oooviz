@@ -1,7 +1,7 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=page5-20261006';
-import { BypassPipeline } from './bypass.js?v=page5-20261006';
-import { HazardPipeline } from './hazards.js?v=page5-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=page5-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=war-timing-20261006';
+import { BypassPipeline } from './bypass.js?v=war-timing-20261006';
+import { HazardPipeline } from './hazards.js?v=war-timing-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=war-timing-20261006';
 
 const bypass = location.pathname.endsWith('/out-of-order.html');
 const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
@@ -65,7 +65,7 @@ function reset() {
   hazardModel = bypass ? new BypassPipeline(activeSeed) : hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
   hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
-  instructionTable = variable ? new InstructionTable(activeSeed, hazards, exaggerated, variable) : null;
+  instructionTable = variable ? new InstructionTable(activeSeed, hazards, exaggerated, variable, bypass) : null;
   lastTick = -1;
   dirty = true;
 }
@@ -100,26 +100,12 @@ function updatePool(frame) {
   const rows = document.querySelector('#pool-rows');
   rows.replaceChildren();
   const queue = frame.instructions.filter(i => i.slot === 3).sort((a, b) => a.number - b.number);
-  // Use the cached frame rather than the prefetched simulation state.
-  const view = Object.create(BypassPipeline.prototype);
-  view.instructions = frame.instructions;
-  const selected = view.selection(1);
   for (const instruction of queue) {
     const row = document.createElement('li');
     row.dataset.number = instruction.number;
     row.classList.toggle('pool-red', frame.red.includes(instruction.number));
     row.classList.toggle('pool-yellow', frame.yellow.includes(instruction.number));
-    const number = document.createElement('strong');
-    number.textContent = instruction.number;
-    const operation = document.createElement('span');
-    operation.append(document.createTextNode(instruction.src !== null ? 'R ' : 'W '),
-      registerBadge(instruction.src !== null ? instruction.src : instruction.dest));
-    const timing = document.createElement('span');
-    timing.textContent = `EX=${instruction.ex}`;
-    const state = document.createElement('small');
-    state.textContent = view.constraints(instruction, 1).status
-      || (instruction === selected ? 'Next to issue' : 'Ready');
-    row.append(number, operation, timing, state);
+    row.textContent = instruction.number;
     rows.append(row);
   }
   if (!queue.length) {

@@ -1,4 +1,4 @@
-import { randomFromSeed, latency } from './simulation.js?v=page5-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=war-timing-20261006';
 
 export class HazardPipeline {
   constructor(seed, exaggerated = false) {

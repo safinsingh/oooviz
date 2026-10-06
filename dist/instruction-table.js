@@ -1,5 +1,6 @@
-import { HazardPipeline } from './hazards.js?v=page5-20261006';
-import { randomFromSeed, latency } from './simulation.js?v=page5-20261006';
+import { BypassPipeline } from './bypass.js?v=war-timing-20261006';
+import { HazardPipeline } from './hazards.js?v=war-timing-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=war-timing-20261006';
 
 export function registerBadge(register) {
   const badge = document.createElement('span');
@@ -10,11 +11,11 @@ export function registerBadge(register) {
 }
 
 export class InstructionTable {
-  constructor(seed, hazards, exaggerated, variable) {
+  constructor(seed, hazards, exaggerated, variable, bypass = false) {
     this.rows = document.querySelector('#instruction-rows');
     this.viewport = document.querySelector('.instruction-log');
     this.catalog = new Map();
-    this.generator = hazards ? new HazardPipeline(seed, exaggerated) : null;
+    this.generator = bypass ? new BypassPipeline(seed) : hazards ? new HazardPipeline(seed, exaggerated) : null;
     this.random = randomFromSeed(seed);
     this.registerRandom = randomFromSeed(`${seed}:table`);
     this.nextNumber = 1;
