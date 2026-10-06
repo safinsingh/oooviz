@@ -23,9 +23,10 @@ main { display: flex; flex-direction: column; align-items: center; min-width: 0;
 .instruction-log tr[aria-current] { font-weight: 700; background: #eff6ff; }
 .instruction-log .row-previous { color: #94a3b8; background: #f8fafc; }
 .instruction-log .row-previous .register { opacity: 0.4; }
-.instruction-log .row-producer { background: #fef08a; }
+.instruction-log tr.row-producer { background: #fef08a; color: #233145; }
 .instruction-log .row-producer .register { opacity: 1; }
-.instruction-log .row-blocked { background: #fee2e2; }
+.instruction-log tr.row-blocked { background: #fecaca; color: #991b1b; }
+.instruction-log tr.row-blocked .current-arrow { color: #991b1b; }
 .current-arrow { display: inline-block; width: 24px; color: #2563eb; font-weight: 700; font-size: 20px; }
 .register { display: inline-block; border-radius: 4px; padding: 2px 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
 .register[data-register="0"] { color: #9d174d; background: #fce7f3; }
