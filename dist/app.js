@@ -1,6 +1,6 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js';
-import { HazardPipeline } from './hazards.js';
-import { InstructionTable, registerBadge } from './instruction-table.js';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=raw-red-20261006';
+import { HazardPipeline } from './hazards.js?v=raw-red-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=raw-red-20261006';
 
 const exaggerated = location.pathname.endsWith('/long-latency.html');
 const hazards = exaggerated || location.pathname.endsWith('/stalls.html');
