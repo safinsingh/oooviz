@@ -10,7 +10,15 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 100%; height: 100%; }
     body { display: grid; place-items: center; background: #fff; overflow: hidden; }
+    main { display: flex; flex-direction: column; align-items: center; gap: 8px; }
     svg { display: block; width: min(1100px, 96vw); height: auto; overflow: visible; }
+    .controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; padding: 0 12px; color: #233145; font: 14px system-ui, sans-serif; }
+    .speed { display: flex; align-items: center; gap: 10px; }
+    input { width: clamp(90px, 18vw, 180px); accent-color: #2563eb; cursor: pointer; }
+    output { min-width: 3.5ch; font-variant-numeric: tabular-nums; }
+    button { border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; padding: 8px 14px; color: #233145; font: inherit; min-width: 76px; cursor: pointer; }
+    button:hover { background: #f1f5f9; }
+    :focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
     .stage { fill: none; stroke: #233145; stroke-width: 2.5; }
     .stage-label { fill: #233145; font: 600 24px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle; }
     .instruction rect { fill: #2563eb; }
@@ -18,19 +26,51 @@
   </style>
 </head>
 <body>
+  <main>
   <svg viewBox="0 0 952 260" role="img" aria-label="A continuous stream of numbered instructions advances in order through five pipeline stages, one hop per clock cycle.">
     <defs><clipPath id="stream-window"><rect x="0" y="0" width="952" height="260"/></clipPath></defs>
     <g id="stages" aria-hidden="true"></g>
     <g id="stream" clip-path="url(#stream-window)" aria-hidden="true"></g>
   </svg>
+  <div class="controls">
+    <div class="speed">
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="0.25" max="3" step="0.05" value="1" aria-describedby="speed-value">
+      <output id="speed-value" for="speed">1×</output>
+    </div>
+    <button id="pause" type="button" aria-pressed="false">Pause</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+  </main>
   <script>
     const NS = 'http://www.w3.org/2000/svg';
     const stages = document.getElementById('stages');
     const stream = document.getElementById('stream');
     const pitch = 100, size = 72, origin = 40, baseline = 94;
-    const cycle = 850, hold = 590;
+    const cycle = 850, hold = 550;
     const nodes = new Map();
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const speedInput = document.getElementById('speed');
+    const speedValue = document.getElementById('speed-value');
+    const pauseButton = document.getElementById('pause');
+    let speed = 1, paused = false, elapsed = 0, previousTime = performance.now();
+
+    speedInput.addEventListener('input', () => {
+      speed = Number(speedInput.value);
+      speedValue.textContent = `${Number(speed.toFixed(2))}×`;
+    });
+    pauseButton.addEventListener('click', () => {
+      paused = !paused;
+      pauseButton.textContent = paused ? 'Resume' : 'Pause';
+      pauseButton.setAttribute('aria-pressed', String(paused));
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      elapsed = 0;
+      previousTime = performance.now();
+      stream.replaceChildren();
+      nodes.clear();
+      render();
+    });
 
     function element(tag, attributes) {
       const node = document.createElementNS(NS, tag);
@@ -51,13 +91,11 @@
       }));
     }
 
-    const start = performance.now();
-    function animate(now) {
-      const elapsed = now - start;
+    function render() {
       const tick = Math.floor(elapsed / cycle);
       const phase = elapsed % cycle;
       const progress = Math.max(0, (phase - hold) / (cycle - hold));
-      const eased = progress * progress * (3 - 2 * progress);
+      const eased = progress * progress * progress * (progress * (progress * 6 - 15) + 10);
       const lift = reducedMotion.matches ? 0 : Math.sin(progress * Math.PI) * 20;
 
       for (const [number, node] of nodes) {
@@ -83,8 +121,15 @@
         const opacity = Math.max(0, Math.min(1, slot + 1, 9 - slot));
         node.setAttribute('opacity', opacity);
       }
+    }
+    function animate(now) {
+      const delta = Math.min(now - previousTime, 50);
+      previousTime = now;
+      if (!paused && !document.hidden) elapsed += delta * speed;
+      render();
       requestAnimationFrame(animate);
     }
+    render();
     requestAnimationFrame(animate);
   </script>
 </body>
