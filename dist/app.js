@@ -6,10 +6,11 @@ const stream = document.querySelector('#stream');
 const speedInput = document.querySelector('#speed');
 const seedInput = document.querySelector('#seed');
 const pauseButton = document.querySelector('#pause');
-const pagePicker = document.querySelector('#page');
+const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
 document.title = variable ? 'Variable EX / MEM pipeline' : 'In-order pipeline';
-pagePicker.value = variable ? 'variable.html' : 'index.html';
+document.querySelector(`.page-picker a[href="${variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
+if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
 speedInput.value = localStorage.getItem('pipeline-speed') ?? '1';
 let speed = Number(speedInput.value), paused = false, elapsed = 0;
@@ -20,18 +21,24 @@ const instructions = new Map();
 const nodes = new Map();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-['IF', 'ID', 'EX', 'MEM', 'WB'].forEach((name, index) => {
+(variable ? ['IF', 'ID', 'EX', 'WB'] : ['IF', 'ID', 'EX', 'MEM', 'WB']).forEach((name, index) => {
   const stage = document.createElement('div');
   stage.className = 'stage';
-  stage.style.left = `${(233 + index * 100) / 952 * 100}%`;
+  stage.style.left = `${(233 + index * 100) / designWidth * 100}%`;
   const label = document.createElement('span');
   label.className = 'stage-label';
   label.textContent = name;
+  if (variable && name === 'EX') {
+    const backend = document.createElement('span');
+    backend.className = 'backend-label';
+    backend.textContent = '(Backend)';
+    label.append(backend);
+  }
   stage.append(label);
   document.querySelector('#stages').append(stage);
 });
 
-new ResizeObserver(([entry]) => { scale = entry.contentRect.width / 952; dirty = true; }).observe(scene);
+new ResizeObserver(([entry]) => { scale = entry.contentRect.width / designWidth; dirty = true; }).observe(scene);
 
 function reset() {
   random = randomFromSeed(seedInput.value);
@@ -47,7 +54,7 @@ function reset() {
 
 function prepare(tick) {
   for (const [number, instruction] of instructions) {
-    if (position(instruction, tick) > 9) {
+    if (position(instruction, tick, variable) > (variable ? 8 : 9)) {
       instructions.delete(number);
       nodes.get(number)?.remove();
       nodes.delete(number);
@@ -71,8 +78,8 @@ function prepare(tick) {
     stream.append(node);
     nodes.set(instruction.number, node);
   }
-  from = layout(instructions.values(), tick);
-  to = layout(instructions.values(), tick + 1);
+  from = layout(instructions.values(), tick, variable);
+  to = layout(instructions.values(), tick + 1, variable);
   lastTick = tick;
   dirty = true;
 }
@@ -124,7 +131,6 @@ function applySeed() {
 }
 document.querySelector('#apply-seed').addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', event => { if (event.key === 'Enter') applySeed(); });
-pagePicker.addEventListener('change', () => { location.href = pagePicker.value; });
 document.addEventListener('visibilitychange', () => { previousTime = performance.now(); });
 updateSpeed();
 reset();

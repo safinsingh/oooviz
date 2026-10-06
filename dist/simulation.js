@@ -17,20 +17,25 @@ export function latency(random, variable) {
     : { ex: 1, mem: random() < 0.5 ? 1 : 5 };
 }
 
-export function position(instruction, tick) {
+export function position(instruction, tick, variable = false) {
   const age = tick - (instruction.number - 2);
   if (age < 4) return age;
+  if (variable) {
+    const backendCycles = Math.max(instruction.ex, instruction.mem);
+    if (age < 4 + backendCycles) return 4;
+    return 5 + age - (4 + backendCycles);
+  }
   if (age < 4 + instruction.ex) return 4;
   if (age < 4 + instruction.ex + instruction.mem) return 5;
   return 6 + age - (4 + instruction.ex + instruction.mem);
 }
 
-export function layout(instructions, tick) {
+export function layout(instructions, tick, variable = false) {
   const groups = new Map();
   const result = new Map();
   for (const instruction of instructions) {
-    const slot = position(instruction, tick);
-    if (slot < -1 || slot > 9) continue;
+    const slot = position(instruction, tick, variable);
+    if (slot < -1 || slot > (variable ? 8 : 9)) continue;
     if (!groups.has(slot)) groups.set(slot, []);
     groups.get(slot).push(instruction);
   }
@@ -38,8 +43,8 @@ export function layout(instructions, tick) {
     group.sort((a, b) => a.number - b.number);
     group.forEach((instruction, rank) => result.set(instruction.number, {
       x: 40 + slot * 100, y: 94 + rank * 84,
-      opacity: slot < 0 || slot > 8 ? 0 : 1,
-      conflict: slot === 6 && group.length > 1
+      opacity: slot < 0 || slot > (variable ? 7 : 8) ? 0 : 1,
+      conflict: slot === (variable ? 5 : 6) && group.length > 1
     }));
   }
   return result;
