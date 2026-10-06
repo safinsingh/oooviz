@@ -1,7 +1,7 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=war-timing-20261006';
-import { BypassPipeline } from './bypass.js?v=war-timing-20261006';
-import { HazardPipeline } from './hazards.js?v=war-timing-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=war-timing-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=hazard-pairs-20261006';
+import { BypassPipeline } from './bypass.js?v=hazard-pairs-20261006';
+import { HazardPipeline } from './hazards.js?v=hazard-pairs-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=hazard-pairs-20261006';
 
 const bypass = location.pathname.endsWith('/out-of-order.html');
 const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
@@ -116,6 +116,17 @@ function updatePool(frame) {
   }
 }
 
+function fitStageOutlines(current, next) {
+  const stages = document.querySelectorAll('.stage');
+  stages.forEach((stage, index) => {
+    const slot = index + 2;
+    const count = Math.max(1,
+      current.filter(i => i.slot === slot).length,
+      next.filter(i => i.slot === slot).length);
+    stage.style.height = `${(86 + (count - 1) * 84) / designWidth * 100}cqw`;
+  });
+}
+
 function prepare(tick) {
   if (hazards) {
     while (hazardFrames.length <= tick + 1) {
@@ -126,7 +137,7 @@ function prepare(tick) {
     const next = hazardFrames[tick + 1];
     from = hazardCurrent.positions;
     to = next.positions;
-    if (bypass) {
+    if (variable) {
       const bottom = Math.max(550, ...[...from.values(), ...to.values()]
         .filter(p => p.opacity > 0).map(p => p.y + 96));
       scene.style.setProperty('--scene-height', String(bottom));
@@ -136,6 +147,7 @@ function prepare(tick) {
       if (!visible.has(number)) { node.remove(); nodes.delete(number); }
     }
     [...hazardCurrent.instructions, ...next.instructions].forEach(addNode);
+    fitStageOutlines(hazardCurrent.instructions, next.instructions);
     if (bypass) updatePool(hazardCurrent);
     retired = hazardCurrent.retired;
     document.querySelector('#stall-status').textContent = hazardCurrent.status;
@@ -177,6 +189,14 @@ function prepare(tick) {
   }
   from = layout(instructions.values(), tick, variable);
   to = layout(instructions.values(), tick + 1, variable);
+  fitStageOutlines(
+    [...instructions.values()].map(i => ({ slot: position(i, tick, variable) })),
+    [...instructions.values()].map(i => ({ slot: position(i, tick + 1, variable) })));
+  if (variable) {
+    const bottom = Math.max(550, ...[...from.values(), ...to.values()]
+      .filter(p => p.opacity > 0).map(p => p.y + 96));
+    scene.style.setProperty('--scene-height', String(bottom));
+  }
   lastTick = tick;
   dirty = true;
   if (variable) instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null,

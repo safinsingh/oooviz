@@ -1,4 +1,4 @@
-import { HazardPipeline } from './hazards.js?v=war-timing-20261006';
+import { HazardPipeline, hazardBetween } from './hazards.js?v=hazard-pairs-20261006';
 
 export class BypassPipeline extends HazardPipeline {
   constructor(seed) {
@@ -20,9 +20,9 @@ export class BypassPipeline extends HazardPipeline {
     const waw = instruction.dest === null ? [] : older.filter(i => i.dest === instruction.dest
       && (i.slot < 4 || instruction.ex <= i.remaining - issueOffset));
     const structural = backend.filter(i => instruction.ex === i.remaining - issueOffset);
-    if (raw.length) return { status: `RAW x${instruction.src}`, red: [instruction.number, ...raw.map(i => i.number)], yellow: [] };
-    if (waw.length) return { status: `WAW x${instruction.dest}`, red: [instruction.number], yellow: waw.map(i => i.number) };
-    if (structural.length) return { status: 'WB structural hazard', red: [instruction.number], yellow: structural.map(i => i.number) };
+    if (raw.length) return { status: hazardBetween('RAW', instruction, raw, instruction.src), red: [instruction.number, ...raw.map(i => i.number)], yellow: [] };
+    if (waw.length) return { status: hazardBetween('WAW', instruction, waw, instruction.dest), red: [instruction.number], yellow: waw.map(i => i.number) };
+    if (structural.length) return { status: hazardBetween('WB structural hazard', instruction, structural), red: [instruction.number], yellow: structural.map(i => i.number) };
     return { status: '', red: [], yellow: [] };
   }
 
@@ -60,12 +60,11 @@ export class BypassPipeline extends HazardPipeline {
     const blocked = oldest ? this.constraints(oldest, issueOffset) : { status: '', red: [], yellow: [] };
     const red = new Set(blocked.red), yellow = new Set(blocked.yellow);
     const statuses = blocked.status ? [`Decode stall: ${blocked.status}`] : [];
-    if (selected && oldest && selected !== oldest) statuses.push(`Bypass: instruction ${selected.number}`);
     // WAR requires WB no later than the older reader’s decode/issue cycle.
     const writers = this.instructions.filter(i => i.dest !== null && i.slot >= 4 && i.slot <= 7);
     if (selected && selected.dest !== null) writers.push(selected);
     const timing = writers.length ? this.projectedTiming() : null;
-    const warRegisters = new Set();
+    const warHazards = [];
     for (const writer of writers) {
       const writeCycle = timing?.completedAt.get(writer.number);
       const readers = this.instructions.filter(i => i.number < writer.number && i.slot <= 3 && i.src === writer.dest
@@ -75,9 +74,9 @@ export class BypassPipeline extends HazardPipeline {
       yellow.add(writer.number);
       red.delete(writer.number);
       for (const reader of readers) red.add(reader.number);
-      warRegisters.add(writer.dest);
+      warHazards.push(hazardBetween('WAR', writer, readers, writer.dest));
     }
-    if (warRegisters.size) statuses.push(`WAR ${[...warRegisters].map(r => `x${r}`).join(', ')}`);
+    statuses.push(...warHazards);
     return { status: statuses.join(' · '), red: [...red], yellow: [...yellow],
       wawInstructions: [], holInstructions: [] };
   }

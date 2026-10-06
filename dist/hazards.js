@@ -1,4 +1,9 @@
-import { randomFromSeed, latency } from './simulation.js?v=war-timing-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=hazard-pairs-20261006';
+
+export function hazardBetween(kind, instruction, others, register = null) {
+  const name = register === null ? kind : `${kind} x${register}`;
+  return `${name} between #${instruction.number} and ${others.map(i => `#${i.number}`).join(', ')}`;
+}
 
 export class HazardPipeline {
   constructor(seed, exaggerated = false) {
@@ -41,7 +46,7 @@ export class HazardPipeline {
     const raw = this.exaggerated && id.src !== null
       ? writers.filter(i => i.dest === id.src) : [];
     if (raw.length) {
-      result.status = `Decode stall: RAW x${id.src}`;
+      result.status = `Decode stall: ${hazardBetween('RAW', id, raw, id.src)}`;
       result.red = [id.number, ...raw.map(i => i.number)];
       // Independent short instructions cannot bypass the blocked instruction in ID.
       const pendingRegisters = new Set(writers.map(i => i.dest));
@@ -49,14 +54,14 @@ export class HazardPipeline {
         && (i.src === null || !pendingRegisters.has(i.src))
         && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
       result.yellow = [...result.holInstructions];
-      if (result.holInstructions.length) result.status += ' · Head-of-line blocking';
+      if (result.holInstructions.length) result.status += ` · Head-of-line blocking: ${result.holInstructions.map(n => `#${n}`).join(', ')} behind #${id.number}`;
     } else if (waw.length) {
-      result.status = `Decode stall: WAW x${id.dest}`;
+      result.status = `Decode stall: ${hazardBetween('WAW', id, waw, id.dest)}`;
       result.red = [id.number];
       result.yellow = waw.map(i => i.number);
       result.wawInstructions = [...result.red, ...result.yellow];
     } else if (structural.length) {
-      result.status = 'Decode stall: WB structural hazard';
+      result.status = `Decode stall: ${hazardBetween('WB structural hazard', id, structural)}`;
       result.red = [id.number];
       result.yellow = structural.map(i => i.number);
     }

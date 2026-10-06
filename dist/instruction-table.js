@@ -1,6 +1,6 @@
-import { BypassPipeline } from './bypass.js?v=war-timing-20261006';
-import { HazardPipeline } from './hazards.js?v=war-timing-20261006';
-import { randomFromSeed, latency } from './simulation.js?v=war-timing-20261006';
+import { BypassPipeline } from './bypass.js?v=hazard-pairs-20261006';
+import { HazardPipeline } from './hazards.js?v=hazard-pairs-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=hazard-pairs-20261006';
 
 export function registerBadge(register) {
   const badge = document.createElement('span');

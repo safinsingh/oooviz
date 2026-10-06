@@ -5,11 +5,9 @@ body { min-height: 100svh; display: grid; place-items: center; background: white
 .workspace.no-table { grid-template-columns: minmax(0, 1fr); }
 main { display: flex; flex-direction: column; align-items: center; min-width: 0; gap: 20px; }
 .scene { position: relative; width: min(1100px, 100%); aspect-ratio: 952 / 260; overflow: hidden; container-type: inline-size; }
-.scene.variable { width: min(1000px, 100%); aspect-ratio: 852 / 550; }
+.scene.variable { width: min(1000px, 100%); aspect-ratio: 852 / var(--scene-height, 550); }
 .stage { position: absolute; top: 33.4615%; width: 9.0336%; height: 33.0769%; border: 2.5px solid #233145; border-radius: 4px; }
-.scene.bypass { aspect-ratio: 852 / var(--scene-height, 550); }
-.bypass .stage { top: 10.2113cqw; height: 10.0939cqw; }
-.variable:not(.bypass) .stage { top: 15.8182%; height: 15.6364%; width: 10.0939%; }
+.variable .stage { top: 10.2113cqw; height: 10.0939cqw; width: 10.0939%; }
 .stage-label { position: absolute; bottom: calc(100% + 18px); left: -10%; width: 120%; text-align: center; font: 600 clamp(12px, 2.94cqw, 28px) ui-monospace, SFMono-Regular, Menlo, monospace; }
 .backend-label { position: absolute; top: 100%; left: -10%; width: 120%; font: 400 clamp(8px, 1.3vw, 14px) system-ui, sans-serif; line-height: 1.15; }
 .instruction { position: absolute; left: 0; top: 0; width: 7.563%; aspect-ratio: 1; border-radius: 3px; background: #2563eb; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; will-change: transform; contain: layout style paint; font: 600 clamp(10px, 3.36cqw, 36px) ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -39,7 +37,7 @@ main { display: flex; flex-direction: column; align-items: center; min-width: 0;
 .destination .register { padding: 0 3px; }
 .metrics { display: flex; justify-content: center; gap: 32px; font-variant-numeric: tabular-nums; }
 .metrics output { margin-left: 6px; font-weight: 600; }
-.stall-status { height: 18px; margin-top: -10px; color: #b45309; text-align: center; }
+.stall-status { min-height: 18px; line-height: 1.5; margin-top: -10px; color: #b45309; text-align: center; }
 .latency { font-size: 0.43em; margin-top: 5px; white-space: nowrap; }
 .controls, .field, .page-picker { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .controls { flex-wrap: wrap; gap: 16px; padding: 0 16px; }
