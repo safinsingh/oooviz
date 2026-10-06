@@ -1,5 +1,6 @@
 import { randomFromSeed, latency, position, layout } from './simulation.js';
 import { HazardPipeline } from './hazards.js';
+import { InstructionTable, registerBadge } from './instruction-table.js';
 
 const exaggerated = location.pathname.endsWith('/long-latency.html');
 const hazards = exaggerated || location.pathname.endsWith('/stalls.html');
@@ -21,6 +22,7 @@ let previousTime = performance.now(), random, nextNumber, scale = 1;
 let lastTick = -1, dirty = true, from = new Map(), to = new Map();
 let hazardModel, hazardCurrent, retired = 0;
 let activeSeed, hazardFrames = [];
+let instructionTable;
 const retiredNumbers = new Set();
 const cycle = 850, hold = 380;
 const instructions = new Map();
@@ -60,6 +62,7 @@ function reset() {
   hazardModel = hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
   hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
+  instructionTable = new InstructionTable(activeSeed, hazards, exaggerated, variable);
   lastTick = -1;
   dirty = true;
 }
@@ -82,7 +85,8 @@ function addNode(instruction) {
   if (hazards) {
     const destination = document.createElement('span');
     destination.className = 'destination';
-    destination.textContent = instruction.src !== null ? `read r${instruction.src}` : `write r${instruction.dest}`;
+    destination.append(document.createTextNode(instruction.src !== null ? 'R ' : 'W '),
+      registerBadge(instruction.src !== null ? instruction.src : instruction.dest));
     node.append(destination);
   }
   stream.append(node);
@@ -106,6 +110,14 @@ function prepare(tick) {
     [...hazardCurrent.instructions, ...next.instructions].forEach(addNode);
     retired = hazardCurrent.retired;
     document.querySelector('#stall-status').textContent = hazardCurrent.status;
+    instructionTable.update(hazardCurrent.instructions.find(i => i.slot === 3)?.number ?? null,
+      hazardCurrent.red, hazardCurrent.yellow);
+    for (const instruction of hazardCurrent.instructions) {
+      const node = nodes.get(instruction.number);
+      if (node) node.title = instruction.slot === 4
+        ? `Total EX latency: ${instruction.ex}. Remaining: ${instruction.remaining} cycles.`
+        : `Total EX latency: ${instruction.ex} cycles.`;
+    }
     lastTick = tick;
     dirty = true;
     updateCounters(tick);
@@ -132,6 +144,7 @@ function prepare(tick) {
   to = layout(instructions.values(), tick + 1, variable);
   lastTick = tick;
   dirty = true;
+  instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null);
   updateCounters(tick);
 }
 

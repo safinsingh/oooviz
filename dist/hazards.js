@@ -24,17 +24,19 @@ export class HazardPipeline {
       slot, remaining: 0 });
   }
 
-  diagnosis() {
+  diagnosis(issueOffset = 1) {
     const id = this.instructions.find(i => i.slot === 3);
     const backend = this.instructions.filter(i => i.slot === 4);
-    const writers = backend.filter(i => i.dest !== null);
+    // ID issues at the next boundary. Existing EX instructions receive that
+    // cycle of service first, so compare against their remaining time then.
+    const writers = backend.filter(i => i.dest !== null && i.remaining > issueOffset);
     const result = { status: '', red: [], yellow: [], wawInstructions: [], holInstructions: [] };
     if (!id) return result;
     const raw = id.src === null ? [] : writers.filter(i => i.dest === id.src);
-    const conflicts = backend.filter(i => id.ex <= i.remaining);
+    const conflicts = backend.filter(i => id.ex <= i.remaining - issueOffset);
     const waw = id.dest === null ? [] : conflicts.filter(i => i.dest === id.dest);
     if (raw.length) {
-      result.status = `Decode stall: RAW r${id.src}`;
+      result.status = `Decode stall: RAW x${id.src}`;
       result.red = [id.number];
       result.yellow = raw.map(i => i.number);
       // A short independent instruction could run now, but cannot bypass ID.
@@ -45,12 +47,12 @@ export class HazardPipeline {
       result.red.push(...result.holInstructions);
       if (result.holInstructions.length) result.status += ' · Head-of-line blocking';
     } else if (waw.length) {
-      result.status = `Decode stall: WAW r${id.dest}`;
+      result.status = `Decode stall: WAW x${id.dest}`;
       result.red = [id.number];
       result.yellow = waw.map(i => i.number);
       result.wawInstructions = [...result.red, ...result.yellow];
     } else if (conflicts.length) {
-      const structural = conflicts.filter(i => id.ex === i.remaining);
+      const structural = conflicts.filter(i => id.ex === i.remaining - issueOffset);
       result.status = structural.length
         ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
       result.red = [id.number];
@@ -73,7 +75,7 @@ export class HazardPipeline {
     for (const i of backend) i.remaining = Math.max(0, i.remaining - 1);
     if (backend[0]?.remaining === 0) backend[0].slot = 5;
     const blockedReady = backend.some(i => i.slot === 4 && i.remaining === 0);
-    const stall = blockedReady || Boolean(this.diagnosis().status);
+    const stall = blockedReady || Boolean(this.diagnosis(0).status);
     const id = this.instructions.find(i => i.slot === 3);
     if (!stall) {
       if (id) { id.slot = 4; id.remaining = id.ex; }
