@@ -37,7 +37,21 @@ export class HazardPipeline {
     const waw = id.dest === null ? [] : backend.filter(i =>
       i.dest === id.dest && id.ex <= i.remaining - issueOffset);
     const structural = backend.filter(i => id.ex === i.remaining - issueOffset);
-    if (waw.length) {
+    const writers = backend.filter(i => i.dest !== null && i.remaining > issueOffset);
+    const raw = this.exaggerated && id.src !== null
+      ? writers.filter(i => i.dest === id.src) : [];
+    if (raw.length) {
+      result.status = `Decode stall: RAW x${id.src}`;
+      result.red = [id.number];
+      result.yellow = raw.map(i => i.number);
+      // Independent short instructions cannot bypass the blocked instruction in ID.
+      const pendingRegisters = new Set(writers.map(i => i.dest));
+      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === 1
+        && (i.src === null || !pendingRegisters.has(i.src))
+        && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
+      result.red.push(...result.holInstructions);
+      if (result.holInstructions.length) result.status += ' · Head-of-line blocking';
+    } else if (waw.length) {
       result.status = `Decode stall: WAW x${id.dest}`;
       result.red = [id.number];
       result.yellow = waw.map(i => i.number);
