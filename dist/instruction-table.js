@@ -36,7 +36,7 @@ export class InstructionTable {
     }
   }
 
-  update(current, red = [], yellow = []) {
+  update(current, red = [], yellow = [], completed = () => false) {
     const cursor = current ?? 1;
     this.ensure(cursor + 24);
     this.rows.replaceChildren();
@@ -47,7 +47,7 @@ export class InstructionTable {
       if (this.variable) row.title = `EX latency: ${instruction.ex} cycles`;
       row.classList.toggle('row-blocked', red.includes(number));
       row.classList.toggle('row-producer', yellow.includes(number));
-      row.classList.toggle('row-previous', number < cursor);
+      row.classList.toggle('row-completed', completed(number));
       const index = document.createElement('td');
       const arrow = document.createElement('span');
       arrow.className = 'current-arrow';

@@ -111,7 +111,7 @@ function prepare(tick) {
     retired = hazardCurrent.retired;
     document.querySelector('#stall-status').textContent = hazardCurrent.status;
     instructionTable.update(hazardCurrent.instructions.find(i => i.slot === 3)?.number ?? null,
-      hazardCurrent.red, hazardCurrent.yellow);
+      hazardCurrent.red, hazardCurrent.yellow, number => number <= hazardCurrent.retired);
     for (const instruction of hazardCurrent.instructions) {
       const node = nodes.get(instruction.number);
       if (node) node.title = instruction.slot === 4
@@ -144,7 +144,11 @@ function prepare(tick) {
   to = layout(instructions.values(), tick + 1, variable);
   lastTick = tick;
   dirty = true;
-  instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null);
+  instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null,
+    [], [], number => {
+      const instruction = instructionTable.catalog.get(number);
+      return position(instruction, tick, variable) > (variable ? 5 : 6);
+    });
   updateCounters(tick);
 }
 
