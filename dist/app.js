@@ -1,7 +1,7 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=hazard-pairs-20261006';
-import { BypassPipeline } from './bypass.js?v=hazard-pairs-20261006';
-import { HazardPipeline } from './hazards.js?v=hazard-pairs-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=hazard-pairs-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=outline-sync-20261006';
+import { BypassPipeline } from './bypass.js?v=outline-sync-20261006';
+import { HazardPipeline } from './hazards.js?v=outline-sync-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=outline-sync-20261006';
 
 const bypass = location.pathname.endsWith('/out-of-order.html');
 const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
@@ -26,6 +26,7 @@ let lastTick = -1, dirty = true, from = new Map(), to = new Map();
 let hazardModel, hazardCurrent, retired = 0;
 let activeSeed, hazardFrames = [];
 let instructionTable;
+let stageOutlines = [], stageHeightsFrom = [], stageHeightsTo = [];
 const retiredNumbers = new Set();
 const cycle = 850, hold = 380;
 const instructions = new Map();
@@ -117,13 +118,16 @@ function updatePool(frame) {
 }
 
 function fitStageOutlines(current, next) {
-  const stages = document.querySelectorAll('.stage');
-  stages.forEach((stage, index) => {
+  stageOutlines = [...document.querySelectorAll('.stage')];
+  stageHeightsFrom = [];
+  stageHeightsTo = [];
+  stageOutlines.forEach((stage, index) => {
     const slot = index + 2;
-    const count = Math.max(1,
-      current.filter(i => i.slot === slot).length,
-      next.filter(i => i.slot === slot).length);
-    stage.style.height = `${(86 + (count - 1) * 84) / designWidth * 100}cqw`;
+    const currentCount = Math.max(1, current.filter(i => i.slot === slot).length);
+    const nextCount = Math.max(1, next.filter(i => i.slot === slot).length);
+    stageHeightsFrom.push(86 + (currentCount - 1) * 84);
+    stageHeightsTo.push(86 + (nextCount - 1) * 84);
+    stage.style.height = `${stageHeightsFrom[index] / designWidth * 100}cqw`;
   });
 }
 
@@ -254,6 +258,12 @@ function render() {
   const progress = Math.max(0, (elapsed % cycle - hold) / (cycle - hold));
   if (!dirty && (paused || progress === 0)) return;
   const eased = reducedMotion.matches ? Math.round(progress) : progress ** 3 * (progress * (progress * 6 - 15) + 10);
+  stageOutlines.forEach((stage, index) => {
+    if (dirty || stageHeightsFrom[index] !== stageHeightsTo[index]) {
+      const height = stageHeightsFrom[index] + (stageHeightsTo[index] - stageHeightsFrom[index]) * eased;
+      stage.style.height = `${height / designWidth * 100}cqw`;
+    }
+  });
   for (const [number, node] of nodes) {
     const a = from.get(number), b = to.get(number);
     if (!a && !b) { node.style.opacity = '0'; continue; }

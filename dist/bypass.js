@@ -1,4 +1,4 @@
-import { HazardPipeline, hazardBetween } from './hazards.js?v=hazard-pairs-20261006';
+import { HazardPipeline, hazardBetween } from './hazards.js?v=outline-sync-20261006';
 
 export class BypassPipeline extends HazardPipeline {
   constructor(seed) {
