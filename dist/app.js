@@ -76,7 +76,7 @@ function addNode(instruction) {
   number.textContent = instruction.number;
   if (String(instruction.number).length > 3) number.style.fontSize = `${3 / String(instruction.number).length}em`;
   node.append(number);
-  if (instruction.ex >= 1) {
+  if (variable && !(exaggerated && instruction.src !== null)) {
     const label = document.createElement('span');
     label.className = 'latency';
     label.textContent = `EX=${instruction.ex}`;

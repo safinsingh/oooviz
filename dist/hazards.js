@@ -19,7 +19,7 @@ export class HazardPipeline {
     const reads = this.exaggerated && readChoice;
     const register = Math.floor(this.registerRandom() * 4);
     this.instructions.push({ number: this.nextNumber++, kind: 'ALU',
-      ex: timing.ex * (this.exaggerated ? 3 : 1),
+      ex: reads ? 1 : timing.ex * (this.exaggerated ? 3 : 1),
       dest: reads ? null : register, src: reads ? register : null,
       slot, remaining: 0 });
   }
@@ -41,7 +41,7 @@ export class HazardPipeline {
       result.yellow = raw.map(i => i.number);
       // A short independent instruction could run now, but cannot bypass ID.
       const pendingRegisters = new Set(writers.map(i => i.dest));
-      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === (this.exaggerated ? 3 : 1)
+      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === 1
         && (i.src === null || !pendingRegisters.has(i.src))
         && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
       result.red.push(...result.holInstructions);

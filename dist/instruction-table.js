@@ -44,7 +44,7 @@ export class InstructionTable {
       const instruction = this.catalog.get(number);
       const row = document.createElement('tr');
       row.dataset.number = number;
-      row.title = `EX latency: ${instruction.ex} cycles`;
+      if (this.variable) row.title = `EX latency: ${instruction.ex} cycles`;
       row.classList.toggle('row-blocked', red.includes(number));
       row.classList.toggle('row-producer', yellow.includes(number));
       row.classList.toggle('row-previous', number < cursor);
@@ -62,6 +62,12 @@ export class InstructionTable {
       if (instruction.dest !== null) writes.append(registerBadge(instruction.dest));
       if (instruction.src !== null) reads.append(registerBadge(instruction.src));
       row.append(index, writes, reads);
+      if (this.variable) {
+        const cycles = document.createElement('td');
+        cycles.className = 'ex-cycles';
+        cycles.textContent = instruction.ex;
+        row.append(cycles);
+      }
       this.rows.append(row);
     }
     if (current !== this.lastCurrent) this.viewport.scrollTop = 0;
