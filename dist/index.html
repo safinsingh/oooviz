@@ -14,6 +14,8 @@
       <div id="stages" aria-hidden="true"></div>
       <div id="stream" aria-hidden="true"></div>
     </div>
+    <div class="metrics" aria-label="Pipeline counters"><span>Cycle <output id="cycle-count">0</output></span><span>CPI <output id="cpi-count" title="Cycles divided by instructions committed at WB">—</output></span></div>
+    <div id="stall-status" class="stall-status" role="status"></div>
     <div class="controls">
       <div class="field"><label for="speed">Speed</label><input id="speed" type="range" min="0.25" max="3" step="0.05" value="1"><output id="speed-value" for="speed">1×</output></div>
       <button id="pause" type="button" aria-pressed="false">Pause</button>
@@ -24,6 +26,7 @@
   <nav class="page-picker" aria-label="Pipeline pages">
     <a href="index.html">In-order pipeline</a>
     <a href="variable.html">Variable EX / MEM</a>
+    <a href="stalls.html">Hazard stalls</a>
   </nav>
 </body>
 </html>

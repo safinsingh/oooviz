@@ -11,10 +11,10 @@ export function randomFromSeed(seed) {
 }
 
 export function latency(random, variable) {
-  if (!variable) return { ex: 1, mem: 1 };
+  if (!variable) return { ex: 1, mem: 1, kind: 'ALU' };
   return random() < 0.5
-    ? { ex: 1 + Math.floor(random() * 4), mem: 1 }
-    : { ex: 1, mem: random() < 0.5 ? 1 : 5 };
+    ? { ex: 1 + Math.floor(random() * 4), mem: 1, kind: 'ALU' }
+    : { ex: 1, mem: random() < 0.5 ? 1 : 5, kind: 'MEM' };
 }
 
 export function position(instruction, tick, variable = false) {

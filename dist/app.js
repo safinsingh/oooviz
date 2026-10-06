@@ -1,6 +1,8 @@
 import { randomFromSeed, latency, position, layout } from './simulation.js';
+import { HazardPipeline } from './hazards.js';
 
-const variable = location.pathname.endsWith('/variable.html');
+const hazards = location.pathname.endsWith('/stalls.html');
+const variable = hazards || location.pathname.endsWith('/variable.html');
 const scene = document.querySelector('.scene');
 const stream = document.querySelector('#stream');
 const speedInput = document.querySelector('#speed');
@@ -8,14 +10,16 @@ const seedInput = document.querySelector('#seed');
 const pauseButton = document.querySelector('#pause');
 const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
-document.title = variable ? 'Variable EX / MEM pipeline' : 'In-order pipeline';
-document.querySelector(`.page-picker a[href="${variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
+document.title = hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX / MEM pipeline' : 'In-order pipeline';
+document.querySelector(`.page-picker a[href="${hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
 if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
 speedInput.value = localStorage.getItem('pipeline-speed') ?? '1';
 let speed = Number(speedInput.value), paused = false, elapsed = 0;
 let previousTime = performance.now(), random, nextNumber, scale = 1;
 let lastTick = -1, dirty = true, from = new Map(), to = new Map();
+let hazardModel, hazardCurrent, retired = 0;
+const retiredNumbers = new Set();
 const cycle = 850, hold = 380;
 const instructions = new Map();
 const nodes = new Map();
@@ -48,14 +52,66 @@ function reset() {
   instructions.clear();
   nodes.clear();
   stream.replaceChildren();
+  retired = 0;
+  retiredNumbers.clear();
+  hazardModel = hazards ? new HazardPipeline(seedInput.value) : null;
+  hazardCurrent = null;
   lastTick = -1;
   dirty = true;
 }
 
+function addNode(instruction) {
+  if (nodes.has(instruction.number)) return;
+  const node = document.createElement('div');
+  node.className = 'instruction';
+  const number = document.createElement('span');
+  number.textContent = instruction.number;
+  if (String(instruction.number).length > 3) number.style.fontSize = `${3 / String(instruction.number).length}em`;
+  node.append(number);
+  if (instruction.ex > 1 || instruction.mem > 1) {
+    const label = document.createElement('span');
+    label.className = 'latency';
+    label.textContent = instruction.ex > 1 ? `EX=${instruction.ex}` : `MEM=${instruction.mem}`;
+    node.append(label);
+  }
+  if (hazards) {
+    const destination = document.createElement('span');
+    destination.className = 'destination';
+    destination.textContent = `→r${instruction.dest}`;
+    node.append(destination);
+  }
+  stream.append(node);
+  nodes.set(instruction.number, node);
+}
+
 function prepare(tick) {
+  if (hazards) {
+    while (hazardModel.cycle < tick) hazardModel.step();
+    hazardCurrent = hazardModel.snapshot();
+    hazardModel.step();
+    const next = hazardModel.snapshot();
+    from = hazardCurrent.positions;
+    to = next.positions;
+    const visible = new Set([...from.keys(), ...to.keys()]);
+    for (const [number, node] of nodes) {
+      if (!visible.has(number)) { node.remove(); nodes.delete(number); }
+    }
+    [...hazardCurrent.instructions, ...next.instructions].forEach(addNode);
+    retired = hazardCurrent.retired;
+    document.querySelector('#stall-status').textContent = hazardCurrent.status;
+    lastTick = tick;
+    dirty = true;
+    updateCounters(tick);
+    return;
+  }
   for (const [number, instruction] of instructions) {
+    if (position(instruction, tick, variable) > (variable ? 5 : 6) && !retiredNumbers.has(number)) {
+      retiredNumbers.add(number);
+      retired++;
+    }
     if (position(instruction, tick, variable) > (variable ? 8 : 9)) {
       instructions.delete(number);
+      retiredNumbers.delete(number);
       nodes.get(number)?.remove();
       nodes.delete(number);
     }
@@ -63,25 +119,18 @@ function prepare(tick) {
   while (nextNumber <= tick + 4) {
     const instruction = { number: nextNumber++, ...latency(random, variable) };
     instructions.set(instruction.number, instruction);
-    const node = document.createElement('div');
-    node.className = 'instruction';
-    const number = document.createElement('span');
-    number.textContent = instruction.number;
-    if (String(instruction.number).length > 3) number.style.fontSize = `${3 / String(instruction.number).length}em`;
-    node.append(number);
-    if (instruction.ex > 1 || instruction.mem > 1) {
-      const label = document.createElement('span');
-      label.className = 'latency';
-      label.textContent = instruction.ex > 1 ? `EX=${instruction.ex}` : `MEM=${instruction.mem}`;
-      node.append(label);
-    }
-    stream.append(node);
-    nodes.set(instruction.number, node);
+    addNode(instruction);
   }
   from = layout(instructions.values(), tick, variable);
   to = layout(instructions.values(), tick + 1, variable);
   lastTick = tick;
   dirty = true;
+  updateCounters(tick);
+}
+
+function updateCounters(tick) {
+  document.querySelector('#cycle-count').textContent = tick;
+  document.querySelector('#cpi-count').textContent = retired ? (tick / retired).toFixed(2) : '—';
 }
 
 function render() {
@@ -93,7 +142,8 @@ function render() {
   for (const [number, node] of nodes) {
     const a = from.get(number), b = to.get(number);
     if (!a && !b) { node.style.opacity = '0'; continue; }
-    const start = a ?? b, end = b ?? a;
+    const start = a ?? { ...b, x: b.x - 100, opacity: 0 };
+    const end = b ?? { ...a, x: a.x + 100, opacity: 0 };
     const moving = start.x !== end.x || start.y !== end.y;
     const lift = moving && !reducedMotion.matches ? Math.sin(progress * Math.PI) * 14 : 0;
     const x = start.x + (end.x - start.x) * eased;
@@ -101,6 +151,7 @@ function render() {
     node.style.transform = `translate3d(${x * scale}px, ${y * scale}px, 0)`;
     node.style.opacity = String(start.opacity + (end.opacity - start.opacity) * eased);
     node.classList.toggle('conflict', progress > 0.5 ? end.conflict : start.conflict);
+    node.classList.toggle('stalled', Boolean(hazards && hazardCurrent.status && start.x <= 340 && start.x === end.x));
   }
   dirty = false;
 }
