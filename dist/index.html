@@ -12,6 +12,7 @@
     body { display: grid; place-items: center; background: #fff; overflow: hidden; }
     svg { display: block; width: min(1100px, 96vw); height: auto; overflow: visible; }
     .stage { fill: none; stroke: #233145; stroke-width: 2.5; }
+    .stage-label { fill: #233145; font: 600 24px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle; }
     .instruction rect { fill: #2563eb; }
     .instruction text { fill: white; font: 600 32px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle; dominant-baseline: central; }
   </style>
@@ -37,7 +38,13 @@
       return node;
     }
 
+    const stageNames = ['IF', 'ID', 'EX', 'MEM', 'WB'];
     for (let i = 0; i < 5; i++) {
+      const label = element('text', {
+        class: 'stage-label', x: origin + (i + 2) * pitch + size / 2, y: baseline - 26
+      });
+      label.textContent = stageNames[i];
+      stages.append(label);
       stages.append(element('rect', {
         class: 'stage', x: origin + (i + 2) * pitch - 7,
         y: baseline - 7, width: size + 14, height: size + 14, rx: 4
