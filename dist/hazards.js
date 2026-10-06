@@ -1,30 +1,65 @@
 import { randomFromSeed, latency } from './simulation.js';
 
 export class HazardPipeline {
-  constructor(seed) {
+  constructor(seed, exaggerated = false) {
     this.random = randomFromSeed(seed);
-    this.destinationRandom = randomFromSeed(`${seed}:dest`);
+    this.registerRandom = randomFromSeed(`${seed}:dest`);
+    this.exaggerated = exaggerated;
     this.cycle = 0;
     this.retired = 0;
     this.nextNumber = 1;
     this.instructions = [];
-    this.status = '';
-    this.wawInstructions = [];
     this.add(1);
     this.add(0);
   }
 
   add(slot) {
     const timing = latency(this.random, true);
-    this.instructions.push({ number: this.nextNumber++, ...timing,
-      dest: Math.floor(this.destinationRandom() * 4), slot, remaining: 0 });
+    const readChoice = this.registerRandom() < 0.35;
+    const reads = this.exaggerated && readChoice;
+    const register = Math.floor(this.registerRandom() * 4);
+    this.instructions.push({ number: this.nextNumber++, kind: 'ALU',
+      ex: reads ? 1 : timing.ex * (this.exaggerated ? 3 : 1),
+      dest: reads ? null : register, src: reads ? register : null,
+      slot, remaining: 0 });
+  }
+
+  diagnosis() {
+    const id = this.instructions.find(i => i.slot === 3);
+    const backend = this.instructions.filter(i => i.slot === 4);
+    const writers = backend.filter(i => i.dest !== null);
+    const result = { status: '', red: [], yellow: [], wawInstructions: [], holInstructions: [] };
+    if (!id) return result;
+    const raw = id.src === null ? [] : writers.filter(i => i.dest === id.src);
+    const conflicts = backend.filter(i => id.ex <= i.remaining);
+    const waw = id.dest === null ? [] : conflicts.filter(i => i.dest === id.dest);
+    if (raw.length) {
+      result.status = `Decode stall: RAW r${id.src}`;
+      result.red = [id.number];
+      result.yellow = raw.map(i => i.number);
+      // A short independent instruction could run now, but cannot bypass ID.
+      const pendingRegisters = new Set(writers.map(i => i.dest));
+      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === 1
+        && (i.src === null || !pendingRegisters.has(i.src))
+        && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
+      result.red.push(...result.holInstructions);
+      if (result.holInstructions.length) result.status += ' · Head-of-line blocking';
+    } else if (waw.length) {
+      result.status = `Decode stall: WAW r${id.dest}`;
+      result.red = [id.number];
+      result.yellow = waw.map(i => i.number);
+      result.wawInstructions = [...result.red, ...result.yellow];
+    } else if (conflicts.length) {
+      result.status = conflicts.some(i => id.ex === i.remaining)
+        ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
+      result.red = [id.number];
+    }
+    return result;
   }
 
   step() {
     this.cycle++;
-    this.status = '';
-    this.wawInstructions = [];
-    // WB is a single write port; retiring always follows program order.
+    // WB is a single write port; commits follow program order.
     this.instructions = this.instructions.filter(i => i.slot < 8);
     for (const i of this.instructions) {
       if (i.slot >= 5) {
@@ -33,40 +68,13 @@ export class HazardPipeline {
       }
     }
     const backend = this.instructions.filter(i => i.slot === 4).sort((a,b) => a.number-b.number);
-    for (const i of backend) {
-      i.remaining = Math.max(0, i.remaining - 1);
-    }
-    // Younger results cannot pass an older incomplete instruction, even if ready.
-    const ready = backend.filter(i => i.remaining === 0);
+    for (const i of backend) i.remaining = Math.max(0, i.remaining - 1);
     if (backend[0]?.remaining === 0) backend[0].slot = 5;
-    const blockedReady = ready.filter(i => i.slot === 4);
-    if (blockedReady.length) {
-      const waw = blockedReady.find(i => backend.some(older => older.number < i.number && older.dest === i.dest));
-      this.status = waw ? `Backend stall: WAW r${waw.dest}` : 'Backend stall: WB structural hazard';
-      if (waw) this.wawInstructions = [waw.number, ...backend.filter(i => i.number < waw.number && i.dest === waw.dest).map(i => i.number)];
-    }
-
+    const blockedReady = backend.some(i => i.slot === 4 && i.remaining === 0);
+    const stall = blockedReady || Boolean(this.diagnosis().status);
     const id = this.instructions.find(i => i.slot === 3);
-    const occupied = this.instructions.filter(i => i.slot === 4);
-    let stall = Boolean(blockedReady.length);
-    if (id && !stall && id.kind === 'ALU') {
-      const duration = id.ex;
-      // Decode reserves completion order and the single WB write port.
-      const conflicts = occupied.filter(i => duration <= i.remaining);
-      if (conflicts.length) {
-        stall = true;
-        const waw = conflicts.find(i => i.dest === id.dest);
-        const structural = conflicts.some(i => duration === i.remaining);
-        this.status = waw ? `Decode stall: WAW r${id.dest}` : structural ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
-        if (waw) this.wawInstructions = [id.number, ...conflicts.filter(i => i.dest === id.dest).map(i => i.number)];
-      }
-    }
     if (!stall) {
-      if (id) {
-        id.slot = 4;
-        id.remaining = id.ex;
-      }
-      // Frontend advances together only when decode can accept another instruction.
+      if (id) { id.slot = 4; id.remaining = id.ex; }
       for (const i of this.instructions) if (i !== id && i.slot < 3) i.slot++;
       if (!this.instructions.some(i => i.slot === 0)) this.add(0);
     }
@@ -87,7 +95,6 @@ export class HazardPipeline {
       }));
     }
     return { positions, instructions: this.instructions.map(i => ({...i})),
-      cycle: this.cycle, retired: this.retired, status: this.status,
-      wawInstructions: [...this.wawInstructions] };
+      cycle: this.cycle, retired: this.retired, ...this.diagnosis() };
   }
 }

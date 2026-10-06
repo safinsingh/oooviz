@@ -1,7 +1,8 @@
 import { randomFromSeed, latency, position, layout } from './simulation.js';
 import { HazardPipeline } from './hazards.js';
 
-const hazards = location.pathname.endsWith('/stalls.html');
+const exaggerated = location.pathname.endsWith('/long-latency.html');
+const hazards = exaggerated || location.pathname.endsWith('/stalls.html');
 const variable = hazards || location.pathname.endsWith('/variable.html');
 const scene = document.querySelector('.scene');
 const stream = document.querySelector('#stream');
@@ -10,8 +11,8 @@ const seedInput = document.querySelector('#seed');
 const pauseButton = document.querySelector('#pause');
 const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
-document.title = hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
-document.querySelector(`.page-picker a[href="${hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
+document.title = exaggerated ? 'Long write latencies' : hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
+document.querySelector(`.page-picker a[href="${exaggerated ? 'long-latency.html' : hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
 if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
 speedInput.value = localStorage.getItem('pipeline-speed') ?? '1';
@@ -56,7 +57,7 @@ function reset() {
   stream.replaceChildren();
   retired = 0;
   retiredNumbers.clear();
-  hazardModel = hazards ? new HazardPipeline(activeSeed) : null;
+  hazardModel = hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
   hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
   lastTick = -1;
@@ -81,7 +82,7 @@ function addNode(instruction) {
   if (hazards) {
     const destination = document.createElement('span');
     destination.className = 'destination';
-    destination.textContent = `→r${instruction.dest}`;
+    destination.textContent = instruction.src !== null ? `read r${instruction.src}` : `write r${instruction.dest}`;
     node.append(destination);
   }
   stream.append(node);
@@ -190,11 +191,8 @@ function render() {
     node.style.transform = `translate3d(${x * scale}px, ${y * scale}px, 0)`;
     node.style.opacity = String(start.opacity + (end.opacity - start.opacity) * eased);
     node.classList.toggle('conflict', progress > 0.5 ? end.conflict : start.conflict);
-    const waw = hazards && hazardCurrent.wawInstructions.length > 0;
-    const highlighted = hazards && (waw
-      ? hazardCurrent.wawInstructions.includes(number)
-      : Boolean(hazardCurrent.status && start.x <= 340 && start.x === end.x));
-    node.classList.toggle('stalled', Boolean(highlighted));
+    node.classList.toggle('hazard-blocked', Boolean(hazards && hazardCurrent.red.includes(number)));
+    node.classList.toggle('hazard-producer', Boolean(hazards && hazardCurrent.yellow.includes(number)));
   }
   dirty = false;
 }
