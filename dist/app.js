@@ -1,7 +1,7 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=outline-sync-20261006';
-import { BypassPipeline } from './bypass.js?v=outline-sync-20261006';
-import { HazardPipeline } from './hazards.js?v=outline-sync-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=outline-sync-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=clean-war-20261006';
+import { BypassPipeline } from './bypass.js?v=clean-war-20261006';
+import { HazardPipeline } from './hazards.js?v=clean-war-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=clean-war-20261006';
 
 const bypass = location.pathname.endsWith('/out-of-order.html');
 const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');

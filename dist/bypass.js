@@ -1,15 +1,19 @@
-import { HazardPipeline, hazardBetween } from './hazards.js?v=outline-sync-20261006';
+import { HazardPipeline, hazardBetween } from './hazards.js?v=clean-war-20261006';
 
 export class BypassPipeline extends HazardPipeline {
   constructor(seed) {
     super(seed, true);
     this.decodeCapacity = 4;
+    this.issueBlocks = [];
   }
 
   add(slot) {
-    super.add(slot);
-    const instruction = this.instructions[this.instructions.length - 1];
-    if (instruction.dest !== null) instruction.ex = instruction.ex <= 6 ? 2 : 12;
+    const writeLatency = this.random() < 0.75 ? 2 : 12;
+    const reads = this.registerRandom() < 0.55;
+    const register = Math.floor(this.registerRandom() * 4);
+    this.instructions.push({ number: this.nextNumber++, kind: 'ALU',
+      ex: reads ? 1 : writeLatency, dest: reads ? null : register,
+      src: reads ? register : null, slot, remaining: 0 });
   }
 
   constraints(instruction, issueOffset) {
@@ -20,10 +24,23 @@ export class BypassPipeline extends HazardPipeline {
     const waw = instruction.dest === null ? [] : older.filter(i => i.dest === instruction.dest
       && (i.slot < 4 || instruction.ex <= i.remaining - issueOffset));
     const structural = backend.filter(i => instruction.ex === i.remaining - issueOffset);
-    if (raw.length) return { status: hazardBetween('RAW', instruction, raw, instruction.src), red: [instruction.number, ...raw.map(i => i.number)], yellow: [] };
-    if (waw.length) return { status: hazardBetween('WAW', instruction, waw, instruction.dest), red: [instruction.number], yellow: waw.map(i => i.number) };
-    if (structural.length) return { status: hazardBetween('WB structural hazard', instruction, structural), red: [instruction.number], yellow: structural.map(i => i.number) };
-    return { status: '', red: [], yellow: [] };
+    const statuses = [], red = new Set(), yellow = new Set();
+    if (raw.length) {
+      statuses.push(hazardBetween('RAW', instruction, raw, instruction.src));
+      red.add(instruction.number);
+      raw.forEach(i => red.add(i.number));
+    }
+    if (waw.length) {
+      statuses.push(hazardBetween('WAW', instruction, waw, instruction.dest));
+      red.add(instruction.number);
+      waw.forEach(i => yellow.add(i.number));
+    }
+    if (structural.length) {
+      statuses.push(hazardBetween('WB structural hazard', instruction, structural));
+      red.add(instruction.number);
+      structural.forEach(i => yellow.add(i.number));
+    }
+    return { status: statuses.join(' · '), red: [...red], yellow: [...yellow] };
   }
 
   selection(issueOffset) {
@@ -44,6 +61,7 @@ export class BypassPipeline extends HazardPipeline {
     projected.issuedAt = new Map(this.issuedAt);
     projected.completedAt = new Map(this.completedAt);
     projected.completed = new Set(this.completed);
+    projected.issueBlocks = [];
     const waitingReads = this.instructions.filter(i => i.src !== null && i.slot <= 3);
     // Run the same scheduler and seeded instruction stream without touching live state.
     // WAR never participates in selection, so prediction cannot introduce a stall.
@@ -58,8 +76,13 @@ export class BypassPipeline extends HazardPipeline {
     const selected = this.selection(issueOffset);
     const oldest = queue[0];
     const blocked = oldest ? this.constraints(oldest, issueOffset) : { status: '', red: [], yellow: [] };
-    const red = new Set(blocked.red), yellow = new Set(blocked.yellow);
-    const statuses = blocked.status ? [`Decode stall: ${blocked.status}`] : [];
+    // Explain the issue decisions at this cycle boundary, including bypassed candidates.
+    const stalled = (this.issueBlocks ?? []).filter(b => queue.some(i => i.number === b.number));
+    const reasons = stalled.length ? stalled : blocked.status ? [blocked] : [];
+    const red = new Set(reasons.flatMap(b => b.red));
+    const yellow = new Set(reasons.flatMap(b => b.yellow));
+    const statuses = [...new Set(reasons.flatMap(b => b.status.split(' · ')))];
+    if (statuses.length) statuses[0] = `Decode stall: ${statuses[0]}`;
     // WAR requires WB no later than the older reader’s decode/issue cycle.
     const writers = this.instructions.filter(i => i.dest !== null && i.slot >= 4 && i.slot <= 7);
     if (selected && selected.dest !== null) writers.push(selected);
@@ -85,6 +108,8 @@ export class BypassPipeline extends HazardPipeline {
     this.cycle++;
     this.advanceBackend();
     const selected = this.selection(0);
+    this.issueBlocks = this.instructions.filter(i => i.slot === 3 && (!selected || i.number < selected.number))
+      .map(i => ({ number: i.number, ...this.constraints(i, 0) })).filter(b => b.status);
     if (selected) this.issueInstruction(selected);
     // Decode buffers four instructions; issue selects the oldest ready one.
     // Fetch continues until the buffer fills, so younger instructions can bypass.
