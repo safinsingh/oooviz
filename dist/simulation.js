@@ -18,7 +18,7 @@ export function latency(random, variable) {
 }
 
 export function position(instruction, tick) {
-  const age = tick - (instruction.number - 9);
+  const age = tick - (instruction.number - 2);
   if (age < 4) return age;
   if (age < 4 + instruction.ex) return 4;
   if (age < 4 + instruction.ex + instruction.mem) return 5;

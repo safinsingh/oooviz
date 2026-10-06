@@ -53,7 +53,7 @@ function prepare(tick) {
       nodes.delete(number);
     }
   }
-  while (nextNumber <= tick + 11) {
+  while (nextNumber <= tick + 4) {
     const instruction = { number: nextNumber++, ...latency(random, variable) };
     instructions.set(instruction.number, instruction);
     const node = document.createElement('div');
