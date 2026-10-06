@@ -9,13 +9,14 @@ export class HazardPipeline {
     this.retired = 0;
     this.nextNumber = 1;
     this.instructions = [];
+    this.issuedAt = new Map();
     this.add(1);
     this.add(0);
   }
 
   add(slot) {
     const timing = latency(this.random, true);
-    const readChoice = this.registerRandom() < 0.35;
+    const readChoice = this.registerRandom() < 0.65;
     const reads = this.exaggerated && readChoice;
     const register = Math.floor(this.registerRandom() * 4);
     this.instructions.push({ number: this.nextNumber++, kind: 'ALU',
@@ -78,7 +79,12 @@ export class HazardPipeline {
     const stall = blockedReady || Boolean(this.diagnosis(0).status);
     const id = this.instructions.find(i => i.slot === 3);
     if (!stall) {
-      if (id) { id.slot = 4; id.remaining = id.ex; }
+      if (id) {
+        id.slot = 4;
+        id.remaining = id.ex;
+        id.issuedAt = this.cycle;
+        this.issuedAt.set(id.number, this.cycle);
+      }
       for (const i of this.instructions) if (i !== id && i.slot < 3) i.slot++;
       if (!this.instructions.some(i => i.slot === 0)) this.add(0);
     }

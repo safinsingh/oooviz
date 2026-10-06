@@ -36,7 +36,7 @@ export class InstructionTable {
     }
   }
 
-  update(current, red = [], yellow = [], completed = () => false) {
+  update(current, red = [], yellow = [], completed = () => false, issuedAt = () => null) {
     const cursor = current ?? 1;
     this.ensure(cursor + 24);
     this.rows.replaceChildren();
@@ -67,6 +67,10 @@ export class InstructionTable {
         cycles.className = 'ex-cycles';
         cycles.textContent = instruction.ex;
         row.append(cycles);
+        const issued = document.createElement('td');
+        issued.className = 'issued-at';
+        issued.textContent = issuedAt(number) ?? '';
+        row.append(issued);
       }
       this.rows.append(row);
     }
