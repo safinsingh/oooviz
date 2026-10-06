@@ -12,16 +12,14 @@ export function randomFromSeed(seed) {
 
 export function latency(random, variable) {
   if (!variable) return { ex: 1, mem: 1, kind: 'ALU' };
-  return random() < 0.5
-    ? { ex: 1 + Math.floor(random() * 4), mem: 1, kind: 'ALU' }
-    : { ex: 1, mem: random() < 0.5 ? 1 : 5, kind: 'MEM' };
+  return { ex: 1 + Math.floor(random() * 4), kind: 'ALU' };
 }
 
 export function position(instruction, tick, variable = false) {
   const age = tick - (instruction.number - 2);
   if (age < 4) return age;
   if (variable) {
-    const backendCycles = Math.max(instruction.ex, instruction.mem);
+    const backendCycles = instruction.ex;
     if (age < 4 + backendCycles) return 4;
     return 5 + age - (4 + backendCycles);
   }

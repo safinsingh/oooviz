@@ -10,7 +10,7 @@ const seedInput = document.querySelector('#seed');
 const pauseButton = document.querySelector('#pause');
 const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
-document.title = hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX / MEM pipeline' : 'In-order pipeline';
+document.title = hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
 document.querySelector(`.page-picker a[href="${hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
 if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
@@ -68,10 +68,10 @@ function addNode(instruction) {
   number.textContent = instruction.number;
   if (String(instruction.number).length > 3) number.style.fontSize = `${3 / String(instruction.number).length}em`;
   node.append(number);
-  if (instruction.ex > 1 || instruction.mem > 1) {
+  if (instruction.ex > 1) {
     const label = document.createElement('span');
     label.className = 'latency';
-    label.textContent = instruction.ex > 1 ? `EX=${instruction.ex}` : `MEM=${instruction.mem}`;
+    label.textContent = `EX=${instruction.ex}`;
     node.append(label);
   }
   if (hazards) {

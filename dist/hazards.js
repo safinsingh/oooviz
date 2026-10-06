@@ -16,7 +16,7 @@ export class HazardPipeline {
   add(slot) {
     const timing = latency(this.random, true);
     this.instructions.push({ number: this.nextNumber++, ...timing,
-      dest: Math.floor(this.destinationRandom() * 4), slot, remaining: 0, revealed: false });
+      dest: Math.floor(this.destinationRandom() * 4), slot, remaining: 0 });
   }
 
   step() {
@@ -33,10 +33,7 @@ export class HazardPipeline {
     const backend = this.instructions.filter(i => i.slot === 4).sort((a,b) => a.number-b.number);
     for (const i of backend) {
       i.remaining = Math.max(0, i.remaining - 1);
-      if (i.kind === 'MEM') i.revealed = true;
     }
-    const memoryWait = backend.find(i => i.kind === 'MEM' && i.remaining > 0);
-    if (memoryWait) this.status = `Backend stall: MEM #${memoryWait.number}`;
     // Younger results cannot pass an older incomplete instruction, even if ready.
     const ready = backend.filter(i => i.remaining === 0);
     if (backend[0]?.remaining === 0) backend[0].slot = 5;
@@ -48,12 +45,11 @@ export class HazardPipeline {
 
     const id = this.instructions.find(i => i.slot === 3);
     const occupied = this.instructions.filter(i => i.slot === 4);
-    let stall = Boolean(memoryWait || blockedReady.length);
+    let stall = Boolean(blockedReady.length);
     if (id && !stall && id.kind === 'ALU') {
       const duration = id.ex;
-      // Decode knows ALU completion times. Memory is predicted as one cycle
-      // until the backend reports its delay; no memory latency stall at decode.
-      const conflicts = occupied.filter(i => duration <= (i.kind === 'MEM' && !i.revealed ? 1 : i.remaining));
+      // Decode reserves completion order and the single WB write port.
+      const conflicts = occupied.filter(i => duration <= i.remaining);
       if (conflicts.length) {
         stall = true;
         const waw = conflicts.find(i => i.dest === id.dest);
@@ -64,7 +60,7 @@ export class HazardPipeline {
     if (!stall) {
       if (id) {
         id.slot = 4;
-        id.remaining = Math.max(id.ex, id.mem);
+        id.remaining = id.ex;
       }
       // Frontend advances together only when decode can accept another instruction.
       for (const i of this.instructions) if (i !== id && i.slot < 3) i.slot++;
