@@ -19,6 +19,7 @@ let speed = Number(speedInput.value), paused = false, elapsed = 0;
 let previousTime = performance.now(), random, nextNumber, scale = 1;
 let lastTick = -1, dirty = true, from = new Map(), to = new Map();
 let hazardModel, hazardCurrent, retired = 0;
+let activeSeed, hazardFrames = [];
 const retiredNumbers = new Set();
 const cycle = 850, hold = 380;
 const instructions = new Map();
@@ -45,7 +46,8 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 new ResizeObserver(([entry]) => { scale = entry.contentRect.width / designWidth; dirty = true; }).observe(scene);
 
 function reset() {
-  random = randomFromSeed(seedInput.value);
+  activeSeed = seedInput.value;
+  random = randomFromSeed(activeSeed);
   nextNumber = 1;
   elapsed = 0;
   previousTime = performance.now();
@@ -54,7 +56,8 @@ function reset() {
   stream.replaceChildren();
   retired = 0;
   retiredNumbers.clear();
-  hazardModel = hazards ? new HazardPipeline(seedInput.value) : null;
+  hazardModel = hazards ? new HazardPipeline(activeSeed) : null;
+  hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
   lastTick = -1;
   dirty = true;
@@ -64,11 +67,12 @@ function addNode(instruction) {
   if (nodes.has(instruction.number)) return;
   const node = document.createElement('div');
   node.className = 'instruction';
+  node.dataset.number = instruction.number;
   const number = document.createElement('span');
   number.textContent = instruction.number;
   if (String(instruction.number).length > 3) number.style.fontSize = `${3 / String(instruction.number).length}em`;
   node.append(number);
-  if (instruction.ex > 1) {
+  if (instruction.ex >= 1) {
     const label = document.createElement('span');
     label.className = 'latency';
     label.textContent = `EX=${instruction.ex}`;
@@ -86,10 +90,12 @@ function addNode(instruction) {
 
 function prepare(tick) {
   if (hazards) {
-    while (hazardModel.cycle < tick) hazardModel.step();
-    hazardCurrent = hazardModel.snapshot();
-    hazardModel.step();
-    const next = hazardModel.snapshot();
+    while (hazardFrames.length <= tick + 1) {
+      hazardModel.step();
+      hazardFrames.push(hazardModel.snapshot());
+    }
+    hazardCurrent = hazardFrames[tick];
+    const next = hazardFrames[tick + 1];
     from = hazardCurrent.positions;
     to = next.positions;
     const visible = new Set([...from.keys(), ...to.keys()]);
@@ -131,6 +137,39 @@ function prepare(tick) {
 function updateCounters(tick) {
   document.querySelector('#cycle-count').textContent = tick;
   document.querySelector('#cpi-count').textContent = retired ? (tick / retired).toFixed(2) : '—';
+  document.querySelector('#previous').disabled = tick === 0;
+}
+
+function snapCycle(direction) {
+  const target = Math.max(0, Math.floor(elapsed / cycle) + direction);
+  setPaused(true);
+  elapsed = target * cycle;
+  previousTime = performance.now();
+  if (!hazards) {
+    // Replay the seed to reconstruct both positions and committed count.
+    random = randomFromSeed(activeSeed);
+    instructions.clear();
+    retiredNumbers.clear();
+    retired = 0;
+    nodes.clear();
+    stream.replaceChildren();
+    nextNumber = 1;
+    while (nextNumber <= target + 4) {
+      const instruction = { number: nextNumber++, ...latency(random, variable) };
+      const slot = position(instruction, target, variable);
+      if (slot > (variable ? 5 : 6)) {
+        retired++;
+        retiredNumbers.add(instruction.number);
+      }
+      if (slot >= -1 && slot <= (variable ? 8 : 9)) {
+        instructions.set(instruction.number, instruction);
+        addNode(instruction);
+      } else retiredNumbers.delete(instruction.number);
+    }
+  }
+  lastTick = -1;
+  dirty = true;
+  render();
 }
 
 function render() {
@@ -151,7 +190,11 @@ function render() {
     node.style.transform = `translate3d(${x * scale}px, ${y * scale}px, 0)`;
     node.style.opacity = String(start.opacity + (end.opacity - start.opacity) * eased);
     node.classList.toggle('conflict', progress > 0.5 ? end.conflict : start.conflict);
-    node.classList.toggle('stalled', Boolean(hazards && hazardCurrent.status && start.x <= 340 && start.x === end.x));
+    const waw = hazards && hazardCurrent.wawInstructions.length > 0;
+    const highlighted = hazards && (waw
+      ? hazardCurrent.wawInstructions.includes(number)
+      : Boolean(hazardCurrent.status && start.x <= 340 && start.x === end.x));
+    node.classList.toggle('stalled', Boolean(highlighted));
   }
   dirty = false;
 }
@@ -170,11 +213,14 @@ function updateSpeed() {
   localStorage.setItem('pipeline-speed', String(speed));
 }
 speedInput.addEventListener('input', updateSpeed);
-pauseButton.addEventListener('click', () => {
-  paused = !paused;
+function setPaused(value) {
+  paused = value;
   pauseButton.textContent = paused ? 'Resume' : 'Pause';
   pauseButton.setAttribute('aria-pressed', String(paused));
-});
+}
+pauseButton.addEventListener('click', () => setPaused(!paused));
+document.querySelector('#previous').addEventListener('click', () => snapCycle(-1));
+document.querySelector('#next').addEventListener('click', () => snapCycle(1));
 document.querySelector('#reset').addEventListener('click', reset);
 function applySeed() {
   localStorage.setItem('pipeline-seed', seedInput.value);

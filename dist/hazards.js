@@ -9,6 +9,7 @@ export class HazardPipeline {
     this.nextNumber = 1;
     this.instructions = [];
     this.status = '';
+    this.wawInstructions = [];
     this.add(1);
     this.add(0);
   }
@@ -22,6 +23,7 @@ export class HazardPipeline {
   step() {
     this.cycle++;
     this.status = '';
+    this.wawInstructions = [];
     // WB is a single write port; retiring always follows program order.
     this.instructions = this.instructions.filter(i => i.slot < 8);
     for (const i of this.instructions) {
@@ -41,6 +43,7 @@ export class HazardPipeline {
     if (blockedReady.length) {
       const waw = blockedReady.find(i => backend.some(older => older.number < i.number && older.dest === i.dest));
       this.status = waw ? `Backend stall: WAW r${waw.dest}` : 'Backend stall: WB structural hazard';
+      if (waw) this.wawInstructions = [waw.number, ...backend.filter(i => i.number < waw.number && i.dest === waw.dest).map(i => i.number)];
     }
 
     const id = this.instructions.find(i => i.slot === 3);
@@ -55,6 +58,7 @@ export class HazardPipeline {
         const waw = conflicts.find(i => i.dest === id.dest);
         const structural = conflicts.some(i => duration === i.remaining);
         this.status = waw ? `Decode stall: WAW r${id.dest}` : structural ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
+        if (waw) this.wawInstructions = [id.number, ...conflicts.filter(i => i.dest === id.dest).map(i => i.number)];
       }
     }
     if (!stall) {
@@ -83,6 +87,7 @@ export class HazardPipeline {
       }));
     }
     return { positions, instructions: this.instructions.map(i => ({...i})),
-      cycle: this.cycle, retired: this.retired, status: this.status };
+      cycle: this.cycle, retired: this.retired, status: this.status,
+      wawInstructions: [...this.wawInstructions] };
   }
 }

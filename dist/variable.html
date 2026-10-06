@@ -18,6 +18,8 @@
     <div id="stall-status" class="stall-status" role="status"></div>
     <div class="controls">
       <div class="field"><label for="speed">Speed</label><input id="speed" type="range" min="0.25" max="3" step="0.05" value="1"><output id="speed-value" for="speed">1×</output></div>
+      <button id="previous" type="button" aria-label="Previous cycle" disabled>Prev</button>
+      <button id="next" type="button" aria-label="Next cycle">Next</button>
       <button id="pause" type="button" aria-pressed="false">Pause</button>
       <button id="reset" type="button">Reset</button>
       <div class="field"><label for="seed">Seed</label><input id="seed" type="text" value="152" maxlength="64" spellcheck="false"><button id="apply-seed" type="button">Set seed</button></div>

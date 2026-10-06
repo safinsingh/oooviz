@@ -29,6 +29,7 @@ button, select, input[type=text] { border: 1px solid #cbd5e1; border-radius: 6px
 input[type=text] { width: 90px; }
 button, select { cursor: pointer; }
 button:hover { background: #f1f5f9; }
+button:disabled { opacity: 0.4; cursor: default; background: white; }
 #pause, #reset { min-width: 76px; }
 :focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
 @media (max-width: 600px) { .stage-label { bottom: calc(100% + 9px); } .stage { border-width: 1.5px; } .latency { margin-top: 2px; font-size: 0.5em; } }
