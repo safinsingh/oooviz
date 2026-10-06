@@ -62,7 +62,7 @@ function reset() {
   hazardModel = hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
   hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
-  instructionTable = new InstructionTable(activeSeed, hazards, exaggerated, variable);
+  instructionTable = variable ? new InstructionTable(activeSeed, hazards, exaggerated, variable) : null;
   lastTick = -1;
   dirty = true;
 }
@@ -150,7 +150,7 @@ function prepare(tick) {
   to = layout(instructions.values(), tick + 1, variable);
   lastTick = tick;
   dirty = true;
-  instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null,
+  if (variable) instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null,
     [], [], number => {
       const instruction = instructionTable.catalog.get(number);
       return position(instruction, tick, variable) > (variable ? 5 : 6);

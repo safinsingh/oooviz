@@ -9,7 +9,7 @@
   <script src="app.js" type="module"></script>
 </head>
 <body>
-  <div class="workspace">
+  <div class="workspace no-table">
   <main>
     <div class="scene" role="img" aria-label="Numbered instructions advance through IF, ID, EX, MEM, and WB.">
       <div id="stages" aria-hidden="true"></div>
@@ -26,13 +26,6 @@
       <div class="field"><label for="seed">Seed</label><input id="seed" type="text" value="152" maxlength="64" spellcheck="false"><button id="apply-seed" type="button">Set seed</button></div>
     </div>
   </main>
-  <aside class="instruction-log" aria-label="Scrolling instruction stream">
-    <table>
-      <caption>Instruction stream</caption>
-      <thead><tr><th scope="col">Instruction</th></tr></thead>
-      <tbody id="instruction-rows"></tbody>
-    </table>
-  </aside>
   </div>
   <nav class="page-picker" aria-label="Pipeline pages">
     <a href="index.html">In-order pipeline</a>
