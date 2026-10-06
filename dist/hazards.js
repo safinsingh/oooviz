@@ -10,6 +10,8 @@ export class HazardPipeline {
     this.nextNumber = 1;
     this.instructions = [];
     this.issuedAt = new Map();
+    this.completed = new Set();
+    this.completedAt = new Map();
     this.add(1);
     this.add(0);
   }
@@ -30,32 +32,18 @@ export class HazardPipeline {
     const backend = this.instructions.filter(i => i.slot === 4);
     // ID issues at the next boundary. Existing EX instructions receive that
     // cycle of service first, so compare against their remaining time then.
-    const writers = backend.filter(i => i.dest !== null && i.remaining > issueOffset);
     const result = { status: '', red: [], yellow: [], wawInstructions: [], holInstructions: [] };
     if (!id) return result;
-    const raw = id.src === null ? [] : writers.filter(i => i.dest === id.src);
-    const conflicts = backend.filter(i => id.ex <= i.remaining - issueOffset);
-    const waw = id.dest === null ? [] : conflicts.filter(i => i.dest === id.dest);
-    if (raw.length) {
-      result.status = `Decode stall: RAW x${id.src}`;
-      result.red = [id.number];
-      result.yellow = raw.map(i => i.number);
-      // A short independent instruction could run now, but cannot bypass ID.
-      const pendingRegisters = new Set(writers.map(i => i.dest));
-      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === 1
-        && (i.src === null || !pendingRegisters.has(i.src))
-        && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
-      result.red.push(...result.holInstructions);
-      if (result.holInstructions.length) result.status += ' · Head-of-line blocking';
-    } else if (waw.length) {
+    const waw = id.dest === null ? [] : backend.filter(i =>
+      i.dest === id.dest && id.ex <= i.remaining - issueOffset);
+    const structural = backend.filter(i => id.ex === i.remaining - issueOffset);
+    if (waw.length) {
       result.status = `Decode stall: WAW x${id.dest}`;
       result.red = [id.number];
       result.yellow = waw.map(i => i.number);
       result.wawInstructions = [...result.red, ...result.yellow];
-    } else if (conflicts.length) {
-      const structural = conflicts.filter(i => id.ex === i.remaining - issueOffset);
-      result.status = structural.length
-        ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
+    } else if (structural.length) {
+      result.status = 'Decode stall: WB structural hazard';
       result.red = [id.number];
       result.yellow = structural.map(i => i.number);
     }
@@ -64,19 +52,25 @@ export class HazardPipeline {
 
   step() {
     this.cycle++;
-    // WB is a single write port; commits follow program order.
+    // WB is a single port; independent instructions may complete out of order.
     this.instructions = this.instructions.filter(i => i.slot < 8);
     for (const i of this.instructions) {
       if (i.slot >= 5) {
-        if (i.slot === 5) this.retired++;
+        if (i.slot === 5) {
+          this.retired++;
+          this.completed.add(i.number);
+        }
         i.slot++;
       }
     }
     const backend = this.instructions.filter(i => i.slot === 4).sort((a,b) => a.number-b.number);
     for (const i of backend) i.remaining = Math.max(0, i.remaining - 1);
-    if (backend[0]?.remaining === 0) backend[0].slot = 5;
-    const blockedReady = backend.some(i => i.slot === 4 && i.remaining === 0);
-    const stall = blockedReady || Boolean(this.diagnosis(0).status);
+    for (const i of backend) if (i.remaining === 0) {
+      i.slot = 5;
+      i.completedAt = this.cycle;
+      this.completedAt.set(i.number, this.cycle);
+    }
+    const stall = Boolean(this.diagnosis(0).status);
     const id = this.instructions.find(i => i.slot === 3);
     if (!stall) {
       if (id) {
@@ -105,6 +99,6 @@ export class HazardPipeline {
       }));
     }
     return { positions, instructions: this.instructions.map(i => ({...i})),
-      cycle: this.cycle, retired: this.retired, ...this.diagnosis() };
+      cycle: this.cycle, retired: this.retired, completed: new Set(this.completed), ...this.diagnosis() };
   }
 }

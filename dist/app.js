@@ -111,9 +111,12 @@ function prepare(tick) {
     retired = hazardCurrent.retired;
     document.querySelector('#stall-status').textContent = hazardCurrent.status;
     instructionTable.update(hazardCurrent.instructions.find(i => i.slot === 3)?.number ?? null,
-      hazardCurrent.red, hazardCurrent.yellow, number => number <= hazardCurrent.retired, number => {
+      hazardCurrent.red, hazardCurrent.yellow, number => hazardCurrent.completed.has(number), number => {
         const issued = hazardModel.issuedAt.get(number);
         return issued !== undefined && issued <= tick ? issued : null;
+      }, number => {
+        const finished = hazardModel.completedAt.get(number);
+        return finished !== undefined && finished <= tick ? finished : null;
       });
     for (const instruction of hazardCurrent.instructions) {
       const node = nodes.get(instruction.number);
@@ -151,7 +154,10 @@ function prepare(tick) {
     [], [], number => {
       const instruction = instructionTable.catalog.get(number);
       return position(instruction, tick, variable) > (variable ? 5 : 6);
-    }, number => tick >= number + 2 ? number + 2 : null);
+    }, number => tick >= number + 2 ? number + 2 : null, number => {
+      const finished = number + 2 + instructionTable.catalog.get(number).ex;
+      return tick >= finished ? finished : null;
+    });
   updateCounters(tick);
 }
 

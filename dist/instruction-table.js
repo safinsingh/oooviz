@@ -36,7 +36,7 @@ export class InstructionTable {
     }
   }
 
-  update(current, red = [], yellow = [], completed = () => false, issuedAt = () => null) {
+  update(current, red = [], yellow = [], completed = () => false, issuedAt = () => null, completedAt = () => null) {
     const cursor = current ?? 1;
     this.ensure(cursor + 24);
     this.rows.replaceChildren();
@@ -57,12 +57,13 @@ export class InstructionTable {
         arrow.setAttribute('aria-label', 'Current instruction in ID');
       }
       index.append(arrow, document.createTextNode(String(number)));
-      const writes = document.createElement('td');
-      const reads = document.createElement('td');
-      if (instruction.dest !== null) writes.append(registerBadge(instruction.dest));
-      if (instruction.src !== null) reads.append(registerBadge(instruction.src));
-      row.append(index, writes, reads);
+      row.append(index);
       if (this.variable) {
+        const writes = document.createElement('td');
+        const reads = document.createElement('td');
+        if (instruction.dest !== null) writes.append(registerBadge(instruction.dest));
+        if (instruction.src !== null) reads.append(registerBadge(instruction.src));
+        row.append(writes, reads);
         const cycles = document.createElement('td');
         cycles.className = 'ex-cycles';
         cycles.textContent = instruction.ex;
@@ -71,6 +72,10 @@ export class InstructionTable {
         issued.className = 'issued-at';
         issued.textContent = issuedAt(number) ?? '';
         row.append(issued);
+        const finished = document.createElement('td');
+        finished.className = 'completed-at';
+        finished.textContent = completedAt(number) ?? '';
+        row.append(finished);
       }
       this.rows.append(row);
     }
