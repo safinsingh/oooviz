@@ -7,7 +7,9 @@ main { display: flex; flex-direction: column; align-items: center; min-width: 0;
 .scene { position: relative; width: min(1100px, 100%); aspect-ratio: 952 / 260; overflow: hidden; container-type: inline-size; }
 .scene.variable { width: min(1000px, 100%); aspect-ratio: 852 / 550; }
 .stage { position: absolute; top: 33.4615%; width: 9.0336%; height: 33.0769%; border: 2.5px solid #233145; border-radius: 4px; }
-.variable .stage { top: 15.8182%; height: 15.6364%; width: 10.0939%; }
+.scene.bypass { aspect-ratio: 852 / var(--scene-height, 550); }
+.bypass .stage { top: 10.2113cqw; height: 10.0939cqw; }
+.variable:not(.bypass) .stage { top: 15.8182%; height: 15.6364%; width: 10.0939%; }
 .stage-label { position: absolute; bottom: calc(100% + 18px); left: -10%; width: 120%; text-align: center; font: 600 clamp(12px, 2.94cqw, 28px) ui-monospace, SFMono-Regular, Menlo, monospace; }
 .backend-label { position: absolute; top: 100%; left: -10%; width: 120%; font: 400 clamp(8px, 1.3vw, 14px) system-ui, sans-serif; line-height: 1.15; }
 .instruction { position: absolute; left: 0; top: 0; width: 7.563%; aspect-ratio: 1; border-radius: 3px; background: #2563eb; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; will-change: transform; contain: layout style paint; font: 600 clamp(10px, 3.36cqw, 36px) ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -56,3 +58,21 @@ button:disabled { opacity: 0.4; cursor: default; background: white; }
 :focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
 @media (max-width: 600px) { .stage-label { bottom: calc(100% + 9px); } .stage { border-width: 1.5px; } .latency { margin-top: 2px; font-size: 0.5em; } }
 @media (max-width: 1000px) { .workspace { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 140px; } .instruction-log { height: 520px; width: min(600px, 100%); justify-self: center; } }
+
+.workspace.with-pool { grid-template-columns: 200px minmax(0, 1fr) 470px; width: min(1760px, 100%); }
+.instruction-pool { align-self: start; margin-top: 60px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+.instruction-pool h2 { font: 600 14px system-ui, sans-serif; margin: 0; padding: 16px; background: #f8fafc; }
+.instruction-pool ol { list-style: none; padding: 0; margin: 0; }
+.instruction-pool li { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; padding: 14px 12px; border-top: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+.instruction-pool small { grid-column: 2 / -1; color: #64748b; }
+.instruction-pool li.pool-yellow { background: #fef08a; color: #233145; }
+.instruction-pool li.pool-red { background: #fecaca; color: #991b1b; }
+.instruction-pool .pool-empty { color: #94a3b8; display: block; }
+@media (max-width: 1200px) {
+  .workspace.with-pool { grid-template-columns: 180px minmax(0, 1fr); }
+  .with-pool .instruction-log { grid-column: 1 / -1; width: min(800px, 100%); justify-self: center; height: 420px; }
+}
+@media (max-width: 700px) {
+  .workspace.with-pool { grid-template-columns: minmax(0, 1fr); }
+  .instruction-pool { margin-top: 0; width: min(400px, 100%); justify-self: center; }
+}

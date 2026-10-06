@@ -1,5 +1,5 @@
-import { HazardPipeline } from './hazards.js?v=raw-red-20261006';
-import { randomFromSeed, latency } from './simulation.js?v=raw-red-20261006';
+import { HazardPipeline } from './hazards.js?v=page5-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=page5-20261006';
 
 export function registerBadge(register) {
   const badge = document.createElement('span');

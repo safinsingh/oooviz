@@ -1,4 +1,4 @@
-import { randomFromSeed, latency } from './simulation.js?v=raw-red-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=page5-20261006';
 
 export class HazardPipeline {
   constructor(seed, exaggerated = false) {
@@ -63,8 +63,7 @@ export class HazardPipeline {
     return result;
   }
 
-  step() {
-    this.cycle++;
+  advanceBackend() {
     // WB is a single port; independent instructions may complete out of order.
     this.instructions = this.instructions.filter(i => i.slot < 8);
     for (const i of this.instructions) {
@@ -83,15 +82,22 @@ export class HazardPipeline {
       i.completedAt = this.cycle;
       this.completedAt.set(i.number, this.cycle);
     }
+  }
+
+  issueInstruction(instruction) {
+    instruction.slot = 4;
+    instruction.remaining = instruction.ex;
+    instruction.issuedAt = this.cycle;
+    this.issuedAt.set(instruction.number, this.cycle);
+  }
+
+  step() {
+    this.cycle++;
+    this.advanceBackend();
     const stall = Boolean(this.diagnosis(0).status);
     const id = this.instructions.find(i => i.slot === 3);
     if (!stall) {
-      if (id) {
-        id.slot = 4;
-        id.remaining = id.ex;
-        id.issuedAt = this.cycle;
-        this.issuedAt.set(id.number, this.cycle);
-      }
+      if (id) this.issueInstruction(id);
       for (const i of this.instructions) if (i !== id && i.slot < 3) i.slot++;
       if (!this.instructions.some(i => i.slot === 0)) this.add(0);
     }

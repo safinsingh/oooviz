@@ -1,8 +1,10 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=raw-red-20261006';
-import { HazardPipeline } from './hazards.js?v=raw-red-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=raw-red-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=page5-20261006';
+import { BypassPipeline } from './bypass.js?v=page5-20261006';
+import { HazardPipeline } from './hazards.js?v=page5-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=page5-20261006';
 
-const exaggerated = location.pathname.endsWith('/long-latency.html');
+const bypass = location.pathname.endsWith('/out-of-order.html');
+const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
 const hazards = exaggerated || location.pathname.endsWith('/stalls.html');
 const variable = hazards || location.pathname.endsWith('/variable.html');
 const scene = document.querySelector('.scene');
@@ -12,8 +14,9 @@ const seedInput = document.querySelector('#seed');
 const pauseButton = document.querySelector('#pause');
 const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
-document.title = exaggerated ? 'Long write latencies' : hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
-document.querySelector(`.page-picker a[href="${exaggerated ? 'long-latency.html' : hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
+scene.classList.toggle('bypass', bypass);
+document.title = bypass ? 'Out-of-order issue' : exaggerated ? 'Long write latencies' : hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
+document.querySelector(`.page-picker a[href="${bypass ? 'out-of-order.html' : exaggerated ? 'long-latency.html' : hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
 if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
 speedInput.value = localStorage.getItem('pipeline-speed') ?? '1';
@@ -59,7 +62,7 @@ function reset() {
   stream.replaceChildren();
   retired = 0;
   retiredNumbers.clear();
-  hazardModel = hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
+  hazardModel = bypass ? new BypassPipeline(activeSeed) : hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
   hazardFrames = hazards ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
   instructionTable = variable ? new InstructionTable(activeSeed, hazards, exaggerated, variable) : null;
@@ -93,6 +96,40 @@ function addNode(instruction) {
   nodes.set(instruction.number, node);
 }
 
+function updatePool(frame) {
+  const rows = document.querySelector('#pool-rows');
+  rows.replaceChildren();
+  const queue = frame.instructions.filter(i => i.slot === 3).sort((a, b) => a.number - b.number);
+  // Use the cached frame rather than the prefetched simulation state.
+  const view = Object.create(BypassPipeline.prototype);
+  view.instructions = frame.instructions;
+  const selected = view.selection(1);
+  for (const instruction of queue) {
+    const row = document.createElement('li');
+    row.dataset.number = instruction.number;
+    row.classList.toggle('pool-red', frame.red.includes(instruction.number));
+    row.classList.toggle('pool-yellow', frame.yellow.includes(instruction.number));
+    const number = document.createElement('strong');
+    number.textContent = instruction.number;
+    const operation = document.createElement('span');
+    operation.append(document.createTextNode(instruction.src !== null ? 'R ' : 'W '),
+      registerBadge(instruction.src !== null ? instruction.src : instruction.dest));
+    const timing = document.createElement('span');
+    timing.textContent = `EX=${instruction.ex}`;
+    const state = document.createElement('small');
+    state.textContent = view.constraints(instruction, 1).status
+      || (instruction === selected ? 'Next to issue' : 'Ready');
+    row.append(number, operation, timing, state);
+    rows.append(row);
+  }
+  if (!queue.length) {
+    const empty = document.createElement('li');
+    empty.className = 'pool-empty';
+    empty.textContent = 'Empty';
+    rows.append(empty);
+  }
+}
+
 function prepare(tick) {
   if (hazards) {
     while (hazardFrames.length <= tick + 1) {
@@ -103,11 +140,17 @@ function prepare(tick) {
     const next = hazardFrames[tick + 1];
     from = hazardCurrent.positions;
     to = next.positions;
+    if (bypass) {
+      const bottom = Math.max(550, ...[...from.values(), ...to.values()]
+        .filter(p => p.opacity > 0).map(p => p.y + 96));
+      scene.style.setProperty('--scene-height', String(bottom));
+    }
     const visible = new Set([...from.keys(), ...to.keys()]);
     for (const [number, node] of nodes) {
       if (!visible.has(number)) { node.remove(); nodes.delete(number); }
     }
     [...hazardCurrent.instructions, ...next.instructions].forEach(addNode);
+    if (bypass) updatePool(hazardCurrent);
     retired = hazardCurrent.retired;
     document.querySelector('#stall-status').textContent = hazardCurrent.status;
     instructionTable.update(hazardCurrent.instructions.find(i => i.slot === 3)?.number ?? null,
