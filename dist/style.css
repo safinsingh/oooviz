@@ -1,0 +1,23 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { min-height: 100svh; display: grid; place-items: center; background: white; color: #233145; font: 14px system-ui, sans-serif; }
+main { display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 20px; }
+.scene { position: relative; width: min(1100px, 96vw); aspect-ratio: 952 / 260; overflow: hidden; }
+.scene.variable { aspect-ratio: 952 / 550; }
+.stage { position: absolute; top: 33.4615%; width: 9.0336%; height: 33.0769%; border: 2.5px solid #233145; border-radius: 4px; }
+.variable .stage { top: 15.8182%; height: 15.6364%; }
+.stage-label { position: absolute; bottom: calc(100% + 18px); left: -10%; width: 120%; text-align: center; font: 600 clamp(12px, 2.4vw, 28px) ui-monospace, SFMono-Regular, Menlo, monospace; }
+.instruction { position: absolute; left: 0; top: 0; width: 7.563%; aspect-ratio: 1; border-radius: 3px; background: #2563eb; color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; will-change: transform; contain: layout style paint; font: 600 clamp(12px, 3.2vw, 36px) ui-monospace, SFMono-Regular, Menlo, monospace; }
+.instruction.conflict { background: #dc2626; }
+.latency { font-size: 0.43em; margin-top: 5px; white-space: nowrap; }
+.controls, .field, .page-picker { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.controls { flex-wrap: wrap; gap: 16px; padding: 0 16px; }
+input[type=range] { width: clamp(90px, 16vw, 180px); accent-color: #2563eb; cursor: pointer; }
+output { min-width: 4ch; font-variant-numeric: tabular-nums; }
+button, select, input[type=text] { border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; padding: 8px 12px; color: inherit; font: inherit; }
+input[type=text] { width: 90px; }
+button, select { cursor: pointer; }
+button:hover { background: #f1f5f9; }
+#pause, #reset { min-width: 76px; }
+:focus-visible { outline: 2px solid #2563eb; outline-offset: 4px; }
+@media (max-width: 600px) { .stage-label { bottom: calc(100% + 9px); } .stage { border-width: 1.5px; } .latency { margin-top: 2px; font-size: 0.5em; } }
