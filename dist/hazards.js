@@ -50,9 +50,11 @@ export class HazardPipeline {
       result.yellow = waw.map(i => i.number);
       result.wawInstructions = [...result.red, ...result.yellow];
     } else if (conflicts.length) {
-      result.status = conflicts.some(i => id.ex === i.remaining)
+      const structural = conflicts.filter(i => id.ex === i.remaining);
+      result.status = structural.length
         ? 'Decode stall: WB structural hazard' : 'Decode stall: ALU completion order';
       result.red = [id.number];
+      result.yellow = structural.map(i => i.number);
     }
     return result;
   }
