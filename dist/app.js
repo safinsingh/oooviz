@@ -16,7 +16,6 @@ const designWidth = variable ? 852 : 952;
 scene.classList.toggle('variable', variable);
 scene.classList.toggle('bypass', bypass);
 document.title = bypass ? 'Out-of-order issue' : exaggerated ? 'Long write latencies' : hazards ? 'Pipeline hazard stalls' : variable ? 'Variable EX pipeline' : 'In-order pipeline';
-document.querySelector(`.page-picker a[href="${bypass ? 'out-of-order.html' : exaggerated ? 'long-latency.html' : hazards ? 'stalls.html' : variable ? 'variable.html' : 'index.html'}"]`).setAttribute('aria-current', 'page');
 if (variable) scene.setAttribute('aria-label', 'Numbered instructions advance through IF, ID, a shared EX backend, and WB.');
 seedInput.value = localStorage.getItem('pipeline-seed') ?? '152';
 speedInput.value = localStorage.getItem('pipeline-speed') ?? '1';
