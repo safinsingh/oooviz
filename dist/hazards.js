@@ -1,4 +1,4 @@
-import { randomFromSeed, latency } from './simulation.js?v=clean-war-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=stall-verified-20261006';
 
 export function hazardBetween(kind, instruction, others, register = null) {
   const name = register === null ? kind : `${kind} x${register}`;
@@ -6,10 +6,11 @@ export function hazardBetween(kind, instruction, others, register = null) {
 }
 
 export class HazardPipeline {
-  constructor(seed, exaggerated = false) {
+  constructor(seed, exaggerated = false, interlocks = true) {
     this.random = randomFromSeed(seed);
     this.registerRandom = randomFromSeed(`${seed}:dest`);
     this.exaggerated = exaggerated;
+    this.interlocks = interlocks;
     this.cycle = 0;
     this.retired = 0;
     this.nextNumber = 1;
@@ -32,44 +33,76 @@ export class HazardPipeline {
       slot, remaining: 0 });
   }
 
-  diagnosis(issueOffset = 1) {
-    const id = this.instructions.find(i => i.slot === 3);
+  constraints(instruction, issueOffset = 1) {
+    const older = this.instructions.filter(i => i.number < instruction.number && i.slot < 5);
     const backend = this.instructions.filter(i => i.slot === 4);
-    // ID issues at the next boundary. Existing EX instructions receive that
-    // cycle of service first, so compare against their remaining time then.
+    // WB happens before operand reads at a boundary. A producer with one
+    // cycle left can therefore feed an instruction issuing at the next boundary.
+    const raw = instruction.src === null ? [] : older.filter(i => i.dest === instruction.src
+      && (i.slot < 4 || i.remaining > issueOffset));
+    const waw = instruction.dest === null ? [] : older.filter(i => i.dest === instruction.dest
+      && (i.slot < 4 || instruction.ex <= i.remaining - issueOffset));
+    // Every instruction uses the single completion/WB slot, including reads.
+    const structural = backend.filter(i => instruction.ex === i.remaining - issueOffset);
+    const statuses = [], red = new Set(), yellow = new Set();
+    for (const [kind, blockers, register] of [
+      ['RAW', raw, instruction.src], ['WAW', waw, instruction.dest],
+      ['WB structural hazard', structural, null]
+    ]) {
+      if (!blockers.length) continue;
+      statuses.push(hazardBetween(kind, instruction, blockers, register));
+      red.add(instruction.number);
+      blockers.forEach(i => (kind === 'RAW' ? red : yellow).add(i.number));
+    }
+    return { status: statuses.join(' · '), red: [...red], yellow: [...yellow],
+      raw, waw, structural };
+  }
+
+  uncheckedDiagnosis() {
+    const active = this.instructions.filter(i => i.slot === 4 || i.slot === 5);
+    const statuses = [], red = new Set(), yellow = new Set();
+    const wb = active.filter(i => i.slot === 5);
+    if (wb.length > 1) {
+      statuses.push(hazardBetween('WB structural hazard', wb[0], wb.slice(1)));
+      wb.forEach(i => red.add(i.number));
+    }
+    for (const younger of active) {
+      const finish = i => i.slot === 5 ? this.cycle : this.cycle + i.remaining;
+      const older = active.filter(i => i.number < younger.number && i.dest === younger.dest
+        && finish(i) >= finish(younger));
+      if (!older.length) continue;
+      statuses.push(hazardBetween('WAW', younger, older, younger.dest));
+      red.add(younger.number);
+      older.forEach(i => yellow.add(i.number));
+    }
+    return { status: statuses.length ? `Unchecked: ${statuses.join(' · ')}` : '',
+      red: [...red], yellow: [...yellow], wawInstructions: [], holInstructions: [] };
+  }
+
+  diagnosis(issueOffset = 1) {
+    if (!this.interlocks) return this.uncheckedDiagnosis();
+    const id = this.instructions.find(i => i.slot === 3);
     const result = { status: '', red: [], yellow: [], wawInstructions: [], holInstructions: [] };
     if (!id) return result;
-    const waw = id.dest === null ? [] : backend.filter(i =>
-      i.dest === id.dest && id.ex <= i.remaining - issueOffset);
-    const structural = backend.filter(i => id.ex === i.remaining - issueOffset);
-    const writers = backend.filter(i => i.dest !== null && i.remaining > issueOffset);
-    const raw = this.exaggerated && id.src !== null
-      ? writers.filter(i => i.dest === id.src) : [];
-    if (raw.length) {
-      result.status = `Decode stall: ${hazardBetween('RAW', id, raw, id.src)}`;
-      result.red = [id.number, ...raw.map(i => i.number)];
-      // Independent short instructions cannot bypass the blocked instruction in ID.
-      const pendingRegisters = new Set(writers.map(i => i.dest));
-      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number && i.ex === 1
-        && (i.src === null || !pendingRegisters.has(i.src))
-        && (i.dest === null || (!pendingRegisters.has(i.dest) && i.dest !== id.src))).map(i => i.number);
-      result.yellow = [...result.holInstructions];
+    const blockers = this.constraints(id, issueOffset);
+    if (!blockers.status) return result;
+    result.status = `Decode stall: ${blockers.status}`;
+    result.red = blockers.red;
+    result.yellow = blockers.yellow;
+    result.wawInstructions = blockers.waw.length ? [id.number, ...blockers.waw.map(i => i.number)] : [];
+    if (blockers.raw.length) {
+      // Mark only instructions that could actually issue now if ID allowed bypass.
+      result.holInstructions = this.instructions.filter(i => i.slot < 3 && i.number > id.number
+        && !this.constraints(i, issueOffset).status).map(i => i.number);
+      result.yellow = [...new Set([...result.yellow, ...result.holInstructions])];
       if (result.holInstructions.length) result.status += ` · Head-of-line blocking: ${result.holInstructions.map(n => `#${n}`).join(', ')} behind #${id.number}`;
-    } else if (waw.length) {
-      result.status = `Decode stall: ${hazardBetween('WAW', id, waw, id.dest)}`;
-      result.red = [id.number];
-      result.yellow = waw.map(i => i.number);
-      result.wawInstructions = [...result.red, ...result.yellow];
-    } else if (structural.length) {
-      result.status = `Decode stall: ${hazardBetween('WB structural hazard', id, structural)}`;
-      result.red = [id.number];
-      result.yellow = structural.map(i => i.number);
     }
     return result;
   }
 
   advanceBackend() {
-    // WB is a single port; independent instructions may complete out of order.
+    // Interlocked pages reserve the single WB slot when issuing. The unchecked
+    // page deliberately permits multiple completions to expose collisions.
     this.instructions = this.instructions.filter(i => i.slot < 8);
     for (const i of this.instructions) {
       if (i.slot >= 5) {
@@ -86,6 +119,14 @@ export class HazardPipeline {
       i.slot = 5;
       i.completedAt = this.cycle;
       this.completedAt.set(i.number, this.cycle);
+      // Record actual WAR corruption before this boundary's operand reads.
+      // Keep the writer identity on the reader even after the writer leaves view.
+      if (i.dest !== null) for (const reader of this.instructions) {
+        if (reader.number < i.number && reader.slot <= 3 && reader.src === i.dest) {
+          reader.warWriter = i.number;
+          reader.warCycle = this.cycle;
+        }
+      }
     }
   }
 
@@ -99,7 +140,7 @@ export class HazardPipeline {
   step() {
     this.cycle++;
     this.advanceBackend();
-    const stall = Boolean(this.diagnosis(0).status);
+    const stall = this.interlocks && Boolean(this.diagnosis(0).status);
     const id = this.instructions.find(i => i.slot === 3);
     if (!stall) {
       if (id) this.issueInstruction(id);
@@ -119,7 +160,7 @@ export class HazardPipeline {
       group.sort((a,b) => a.number-b.number);
       group.forEach((i, rank) => positions.set(i.number, {
         x: 40 + slot*100, y: 94 + rank*84,
-        opacity: slot > 7 ? 0 : 1, conflict: false
+        opacity: slot > 7 ? 0 : 1, conflict: slot === 5 && group.length > 1
       }));
     }
     return { positions, instructions: this.instructions.map(i => ({...i})),

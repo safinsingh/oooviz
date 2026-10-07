@@ -5,34 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>In-order pipeline</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='3' fill='none' stroke='%23233145' stroke-width='2'/%3E%3Crect x='7' y='7' width='18' height='18' rx='2' fill='%232563eb'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=clean-war-20261006">
-  <script src="app.js?v=clean-war-20261006" type="module"></script>
+  <link rel="stylesheet" href="style.css?v=stall-verified-20261006">
+  <script src="app.js?v=stall-verified-20261006" type="module"></script>
 </head>
 <body>
+  <header class="page-header"><a class="site-name" href="index.html">Pipeline</a><nav class="page-picker" aria-label="Pipeline pages">
+    <a href="index.html"><span class="page-number">1</span> Uniform latency</a>
+    <a href="variable.html"><span class="page-number">2</span> Variable latency</a>
+    <a href="stalls.html"><span class="page-number">3</span> Hazard stalls</a>
+    <a href="long-latency.html"><span class="page-number">4</span> Read dependencies</a>
+    <a href="out-of-order.html"><span class="page-number">5</span> Out-of-order issue</a>
+  </nav></header>
   <div class="workspace no-table">
   <main>
+    <header class="scenario"><h1>Uniform latency</h1><p>In-order issue and completion. Every stage takes one cycle.</p></header>
+    <div class="scene-viewport" role="region" aria-label="Pipeline diagram; scroll horizontally on small screens" tabindex="0">
     <div class="scene" role="img" aria-label="Numbered instructions advance through IF, ID, EX, MEM, and WB.">
       <div id="stages" aria-hidden="true"></div>
       <div id="stream" aria-hidden="true"></div>
     </div>
+    </div>
     <div class="metrics" aria-label="Pipeline counters"><span>Cycle <output id="cycle-count">0</output></span><span>CPI <output id="cpi-count" title="Cycles divided by instructions committed at WB">—</output></span></div>
     <div id="stall-status" class="stall-status" role="status"></div>
     <div class="controls">
+      <div class="transport" role="group" aria-label="Playback">
+        <button id="previous" type="button" aria-label="Previous cycle" disabled>Prev</button>
+        <button id="pause" type="button" aria-pressed="false">Pause</button>
+        <button id="next" type="button" aria-label="Next cycle">Next</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
       <div class="field"><label for="speed">Speed</label><input id="speed" type="range" min="0.25" max="3" step="0.05" value="1"><output id="speed-value" for="speed">1×</output></div>
-      <button id="previous" type="button" aria-label="Previous cycle" disabled>Prev</button>
-      <button id="next" type="button" aria-label="Next cycle">Next</button>
-      <button id="pause" type="button" aria-pressed="false">Pause</button>
-      <button id="reset" type="button">Reset</button>
-      <div class="field"><label for="seed">Seed</label><input id="seed" type="text" value="152" maxlength="64" spellcheck="false"><button id="apply-seed" type="button">Set seed</button></div>
+      <div class="field seed-field"><label for="seed">Seed</label><input id="seed" type="text" value="152" maxlength="64" spellcheck="false"><button id="apply-seed" type="button">Set seed</button></div>
     </div>
   </main>
   </div>
-  <nav class="page-picker" aria-label="Pipeline pages">
-    <a href="index.html">In-order pipeline</a>
-    <a href="variable.html">Variable EX</a>
-    <a href="stalls.html">Hazard stalls</a>
-    <a href="long-latency.html">Long write latencies</a>
-    <a href="out-of-order.html">Out-of-order issue</a>
-  </nav>
+
 </body>
 </html>

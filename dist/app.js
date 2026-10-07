@@ -1,7 +1,7 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=clean-war-20261006';
-import { BypassPipeline } from './bypass.js?v=clean-war-20261006';
-import { HazardPipeline } from './hazards.js?v=clean-war-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=clean-war-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=stall-verified-20261006';
+import { BypassPipeline } from './bypass.js?v=stall-verified-20261006';
+import { HazardPipeline } from './hazards.js?v=stall-verified-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=stall-verified-20261006';
 
 const bypass = location.pathname.endsWith('/out-of-order.html');
 const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
@@ -40,10 +40,13 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const label = document.createElement('span');
   label.className = 'stage-label';
   label.textContent = name;
+  if (name === 'ID') label.title = 'Operands are read when issuing to EX. Same-cycle WB is visible to reads.';
+  if (name === 'WB') label.title = 'One completion slot per cycle. Unchecked hazards can violate this limit.';
   if (variable && name === 'EX') {
     const backend = document.createElement('span');
     backend.className = 'backend-label';
-    backend.textContent = '(Backend)';
+    backend.textContent = 'Backend';
+    backend.title = 'Fully pipelined execution: multiple instructions may overlap.';
     label.append(backend);
   }
   stage.append(label);
@@ -63,8 +66,8 @@ function reset() {
   stream.replaceChildren();
   retired = 0;
   retiredNumbers.clear();
-  hazardModel = bypass ? new BypassPipeline(activeSeed) : hazards ? new HazardPipeline(activeSeed, exaggerated) : null;
-  hazardFrames = hazards ? [hazardModel.snapshot()] : [];
+  hazardModel = bypass ? new BypassPipeline(activeSeed) : variable ? new HazardPipeline(activeSeed, exaggerated, hazards) : null;
+  hazardFrames = variable ? [hazardModel.snapshot()] : [];
   hazardCurrent = null;
   instructionTable = variable ? new InstructionTable(activeSeed, hazards, exaggerated, variable, bypass) : null;
   lastTick = -1;
@@ -86,7 +89,7 @@ function addNode(instruction) {
     label.textContent = `EX=${instruction.ex}`;
     node.append(label);
   }
-  if (hazards) {
+  if (variable) {
     const destination = document.createElement('span');
     destination.className = 'destination';
     destination.append(document.createTextNode(instruction.src !== null ? 'R ' : 'W '),
@@ -132,7 +135,7 @@ function fitStageOutlines(current, next) {
 }
 
 function prepare(tick) {
-  if (hazards) {
+  if (variable) {
     while (hazardFrames.length <= tick + 1) {
       hazardModel.step();
       hazardFrames.push(hazardModel.snapshot());
@@ -142,7 +145,7 @@ function prepare(tick) {
     from = hazardCurrent.positions;
     to = next.positions;
     if (variable) {
-      const bottom = Math.max(550, ...[...from.values(), ...to.values()]
+      const bottom = Math.max(350, ...[...from.values(), ...to.values()]
         .filter(p => p.opacity > 0).map(p => p.y + 96));
       scene.style.setProperty('--scene-height', String(bottom));
     }
@@ -154,7 +157,14 @@ function prepare(tick) {
     fitStageOutlines(hazardCurrent.instructions, next.instructions);
     if (bypass) updatePool(hazardCurrent);
     retired = hazardCurrent.retired;
-    document.querySelector('#stall-status').textContent = hazardCurrent.status;
+    const completing = hazardCurrent.instructions.filter(i => i.slot === 5);
+    const overtaker = completing.find(i => hazardCurrent.instructions.some(older => older.number < i.number && older.slot < 5));
+    const completionNote = overtaker ? `#${overtaker.number} completes ahead of an older instruction.` : '';
+    const readyNote = bypass ? 'The oldest ready instruction issues; blocked instructions may be bypassed.'
+      : hazards ? 'No stall needed at the next boundary.' : 'Issue continues without hazard checks.';
+    const status = document.querySelector('#stall-status');
+    status.textContent = hazardCurrent.status || completionNote || readyNote;
+    status.classList.toggle('has-hazard', Boolean(hazardCurrent.status));
     instructionTable.update(hazardCurrent.instructions.find(i => i.slot === 3)?.number ?? null,
       hazardCurrent.red, hazardCurrent.yellow, number => hazardCurrent.completed.has(number), number => {
         const issued = hazardModel.issuedAt.get(number);
@@ -196,21 +206,9 @@ function prepare(tick) {
   fitStageOutlines(
     [...instructions.values()].map(i => ({ slot: position(i, tick, variable) })),
     [...instructions.values()].map(i => ({ slot: position(i, tick + 1, variable) })));
-  if (variable) {
-    const bottom = Math.max(550, ...[...from.values(), ...to.values()]
-      .filter(p => p.opacity > 0).map(p => p.y + 96));
-    scene.style.setProperty('--scene-height', String(bottom));
-  }
   lastTick = tick;
   dirty = true;
-  if (variable) instructionTable.update([...instructions.values()].find(i => position(i, tick, variable) === 3)?.number ?? null,
-    [], [], number => {
-      const instruction = instructionTable.catalog.get(number);
-      return position(instruction, tick, variable) > (variable ? 5 : 6);
-    }, number => tick >= number + 2 ? number + 2 : null, number => {
-      const finished = number + 2 + instructionTable.catalog.get(number).ex;
-      return tick >= finished ? finished : null;
-    });
+  document.querySelector('#stall-status').textContent = 'One instruction advances per cycle. Completion stays in program order.';
   updateCounters(tick);
 }
 
@@ -225,7 +223,7 @@ function snapCycle(direction) {
   setPaused(true);
   elapsed = target * cycle;
   previousTime = performance.now();
-  if (!hazards) {
+  if (!variable) {
     // Replay the seed to reconstruct both positions and committed count.
     random = randomFromSeed(activeSeed);
     instructions.clear();
@@ -276,8 +274,8 @@ function render() {
     node.style.transform = `translate3d(${x * scale}px, ${y * scale}px, 0)`;
     node.style.opacity = String(start.opacity + (end.opacity - start.opacity) * eased);
     node.classList.toggle('conflict', progress > 0.5 ? end.conflict : start.conflict);
-    node.classList.toggle('hazard-blocked', Boolean(hazards && hazardCurrent.red.includes(number)));
-    node.classList.toggle('hazard-producer', Boolean(hazards && hazardCurrent.yellow.includes(number)));
+    node.classList.toggle('hazard-blocked', Boolean(variable && hazardCurrent.red.includes(number)));
+    node.classList.toggle('hazard-producer', Boolean(variable && hazardCurrent.yellow.includes(number)));
   }
   dirty = false;
 }
