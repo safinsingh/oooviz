@@ -1,4 +1,4 @@
-import { randomFromSeed, latency } from './simulation.js?v=stall-verified-20261006';
+import { randomFromSeed, latency } from './simulation.js?v=pipeline-pages-20261006';
 
 export function hazardBetween(kind, instruction, others, register = null) {
   const name = register === null ? kind : `${kind} x${register}`;

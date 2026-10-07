@@ -1,12 +1,13 @@
-import { randomFromSeed, latency, position, layout } from './simulation.js?v=stall-verified-20261006';
-import { BypassPipeline } from './bypass.js?v=stall-verified-20261006';
-import { HazardPipeline } from './hazards.js?v=stall-verified-20261006';
-import { InstructionTable, registerBadge } from './instruction-table.js?v=stall-verified-20261006';
+import { randomFromSeed, latency, position, layout } from './simulation.js?v=pipeline-pages-20261006';
+import { BypassPipeline } from './bypass.js?v=pipeline-pages-20261006';
+import { HazardPipeline } from './hazards.js?v=pipeline-pages-20261006';
+import { InstructionTable, registerBadge } from './instruction-table.js?v=pipeline-pages-20261006';
 
-const bypass = location.pathname.endsWith('/out-of-order.html');
-const exaggerated = bypass || location.pathname.endsWith('/long-latency.html');
-const hazards = exaggerated || location.pathname.endsWith('/stalls.html');
-const variable = hazards || location.pathname.endsWith('/variable.html');
+const page = document.body.dataset.page || location.pathname.split('/').pop()?.replace(/\.html$/, '') || 'index';
+const bypass = page === 'out-of-order';
+const exaggerated = bypass || page === 'long-latency';
+const hazards = exaggerated || page === 'stalls';
+const variable = hazards || page === 'variable';
 const scene = document.querySelector('.scene');
 const stream = document.querySelector('#stream');
 const speedInput = document.querySelector('#speed');

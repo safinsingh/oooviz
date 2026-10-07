@@ -1,4 +1,4 @@
-import { HazardPipeline } from './hazards.js?v=stall-verified-20261006';
+import { HazardPipeline } from './hazards.js?v=pipeline-pages-20261006';
 
 export class BypassPipeline extends HazardPipeline {
   constructor(seed) {
